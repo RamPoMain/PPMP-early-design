@@ -1,44 +1,19 @@
-/* step1.css - PAGE 1 SPECIFIC */
-
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* Two columns */
-  gap: 30px;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
 }
 
-/* DROPDOWN FIXES */
-.select-wrapper {
-  position: relative; /* IMPORTANT: Keeps the chevron inside the box */
-  width: 100%;
-}
-
-select {
-  appearance: none; /* Removes default browser arrow */
-  padding-right: 40px;
-  cursor: pointer;
-}
-
+.select-wrapper { position: relative; width: 100%; }
+select { appearance: none; padding-right: 40px; }
 .custom-chevron {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%); /* Centers it vertically */
-  width: 10px;
-  pointer-events: none; /* Allows clicks to go through to the select box */
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  width: 10px; pointer-events: none;
 }
 
-/* ERROR STATE (Recommended Mode) */
-.error-state select {
-  border-color: #dc2626 !important;
-  background-color: #fef2f2 !important;
-}
+.error-state select { border-color: var(--error-red) !important; background-color: #fef2f2 !important; }
+.text-45 { color: var(--error-red); font-size: 11px; margin-top: 4px; }
+textarea { min-height: 120px; resize: vertical; }
 
-.text-45 { 
-  color: #dc2626; 
-  font-size: 11px; 
-  margin-top: 4px;
-}
-
-textarea {
-  min-height: 120px;
-}
+.track-4 { background: rgba(0,0,0,0.1); height: 6px; border-radius: 10px; overflow: hidden; }
+.filled-5 { background: #0088ff; height: 100%; transition: 0.3s; }
