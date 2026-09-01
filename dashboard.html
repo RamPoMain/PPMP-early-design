@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DICT Procurement Dashboard</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
+  <!-- Reuse your base layout -->
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<div class="wireframe-1-1">
+  <!-- Reusing your Header Banner -->
+  <header class="header-container">
+    <img src="images/header-banner.png" class="header-banner" alt="DICT Header Banner">
+  </header>
+
+  <div class="main-card-container">
+    <!-- Reusing the Title Tab design -->
+    <div class="title-tab-wrapper">
+      <p class="text-9">PROCUREMENT DASHBOARD</p>
+    </div>
+
+    <!-- Top Action Bar -->
+    <div class="dashboard-header">
+      <div class="welcome-msg">
+        <h2>Welcome back, Admin</h2>
+        <p>Manage and track your procurement requests here.</p>
+      </div>
+      <!-- THE BUTTON TO THE FORMS -->
+      <a href="page1.html" class="create-btn">+ Create New Request</a>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Active Requests</span>
+        <span class="stat-value">12</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Pending Approval</span>
+        <span class="stat-value">5</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Completed</span>
+        <span class="stat-value">28</span>
+      </div>
+    </div>
+
+    <!-- Recent Projects Table -->
+    <div class="table-container">
+      <h3>Recent Procurement Activities</h3>
+      <table class="dashboard-table">
+        <thead>
+          <tr>
+            <th>PPMP No.</th>
+            <th>Project Title</th>
+            <th>Implementing Unit</th>
+            <th>Estimated Budget</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2024-001</td>
+            <td>Cloud Infrastructure Upgrade</td>
+            <td>ICTMD</td>
+            <td>PHP 2,500,000</td>
+            <td><span class="badge pending">Pending</span></td>
+          </tr>
+          <tr>
+            <td>2024-002</td>
+            <td>Technical Support Services</td>
+            <td>Planning Service</td>
+            <td>PHP 850,000</td>
+            <td><span class="badge active">Active</span></td>
+          </tr>
+          <tr>
+            <td>2023-156</td>
+            <td>Office Supplies Q4</td>
+            <td>Admin Service</td>
+            <td>PHP 120,000</td>
+            <td><span class="badge completed">Completed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

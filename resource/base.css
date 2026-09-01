@@ -1,0 +1,150 @@
+/* base.css - SHARED LAYOUT */
+:root {
+  --font-family-roboto: 'Roboto', sans-serif;
+  --font-family-inter: 'Inter', sans-serif;
+  --text-rgb-109-114-128: rgba(109, 114, 128, 1);
+  --text-rgb-73-69-79: rgba(73, 69, 79, 1);
+  --text-rgb-220-38-38: rgba(220, 38, 38, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { 
+  background-color: #f2ecd3; /* DICT Beige */
+  font-family: var(--font-family-inter);
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Global Container */
+.wireframe-1-1 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+/* HEADER BANNER FIX */
+.header-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.header-banner {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* THE GRAY CARD */
+.main-card-container {
+  background-color: rgba(217, 217, 217, 1);
+  width: 100%;
+  max-width: 1100px;
+  padding: 80px 50px 40px 50px;
+  position: relative;
+  border-radius: 4px;
+}
+
+/* THE WHITE TITLE TAB */
+.title-tab-wrapper {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 15px 40px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  z-index: 10;
+}
+
+.text-9 {
+  font-family: var(--font-family-roboto);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-rgb-73-69-79);
+  text-align: center;
+}
+
+/* PROGRESS BAR */
+.track-4 {
+  background-color: rgba(120, 120, 120, 0.2);
+  border-radius: 100px;
+  height: 4px;
+}
+
+.filled-5 {
+  background-color: rgba(0, 136, 255, 1);
+  border-radius: 100px;
+  height: 100%;
+}
+
+/* COMMON FORM ELEMENTS */
+.field-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+label { font-size: 14px; color: var(--text-rgb-109-114-128); font-weight: 500; }
+input, select, textarea { 
+  width: 100%; padding: 12px; border: 1px solid #d2d5da; border-radius: 6px; 
+  background: #f9fafb; font-family: var(--font-family-inter); font-size: 16px;
+}
+
+.hidden { display: none !important; }
+
+/* FOOTER / BUTTONS */
+.footer-actions {
+  display: flex;
+  justify-content: flex-end; /* This pushes the Next button to the right */
+  align-items: center;
+  margin-top: 30px;
+  gap: 20px;
+}
+
+a.back-btn {
+  text-decoration: none; /* Removes underline */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+a.back-btn:hover {
+  text-decoration: none;
+  color: #ef4444; /* Optional: turns red on hover to indicate "Exit/Cancel" */
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-family-inter);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-rgb-109-114-128); /* Grayish color */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto; /* This magic trick pushes the back button to the far left */
+  transition: color 0.2s;
+}
+
+.back-btn:hover {
+  color: var(--text-rgb-73-69-79);
+}
+
+.next-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-family-inter);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-rgb-73-69-79);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.next-btn:hover {
+  opacity: 0.7;
+}
