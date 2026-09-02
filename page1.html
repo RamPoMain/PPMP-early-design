@@ -68,16 +68,55 @@
                 <img src="images/vector-33.svg" class="custom-chevron">
               </div>
             </div>
+            <div class="field-group">
+              <label>End-User or Implementing Unit</label>
+              <div class="select-wrapper">
+                <select><option>ILCDB</option><option>FPIAP</option></select>
+                <img src="images/vector-33.svg" class="custom-chevron">
+              </div>
+            </div>
           </div>
           <!-- Right Column -->
           <div class="form-column">
             <div class="field-group">
               <label>Recommended Mode of Procurement</label>
-              <div class="select-wrapper error-state">
-                <select required><option value="" disabled selected></option></select>
+              <div id="modeWrapper" class="select-wrapper error-state">
+                <select id="modeOfProcurement" required>
+                  <option value="" disabled selected>Select mode...</option>
+                  
+                  <optgroup label="Standard Mode">
+                    <option value="competitive_bidding">Competitive Bidding</option>
+                  </optgroup>
+
+                  <optgroup label="Alternative Modes">
+                    <option value="limited_source">Limited Source Bidding</option>
+                    <option value="direct_contracting">Direct Contracting</option>
+                    <option value="repeat_order">Repeat Order</option>
+                    <option value="shopping">Shopping</option>
+                    <option value="direct_acquisition">Direct Acquisition (New under RA 12009)</option>
+                    <option value="competitive_dialogue">Competitive Dialogue (New under RA 12009)</option>
+                    <option value="unsolicited_offer">Unsolicited Offer with Comparative Bidding</option>
+                  </optgroup>
+
+                  <optgroup label="Negotiated Procurement (Specific Cases)">
+                    <option value="neg_emergency">Two Failed Biddings</option>
+                    <option value="neg_emergency">Emergency Cases</option>
+                    <option value="neg_takeover">Take-over of Contracts</option>
+                    <option value="neg_adjacent">Adjacent or Contiguous</option>
+                    <option value="neg_agency">Agency-to-Agency</option>
+                    <option value="neg_scientific">Scientific, Scholarly or Artistic Work</option>
+                    <option value="neg_highly_technical">Highly Technical Consultants</option>
+                    <option value="neg_svp">Small Value Procurement (SVP)</option>
+                    <option value="neg_lease">Lease of Real Property and Venue</option>
+                    <option value="neg_ngo">NGO Participation</option>
+                    <option value="neg_community">Community Participation</option>
+                    <option value="neg_retail">Direct Retail Purchase (Fuel, Airline Tickets, etc.)</option>
+                  </optgroup>
+                </select>
+                <!-- Reusing your custom chevron icon -->
                 <img src="images/vector-43.svg" class="custom-chevron">
               </div>
-              <p class="text-45">Must Select Mode of Procurement</p>
+              <p id="modeErrorMsg" class="text-45">Must Select Mode of Procurement</p>
             </div>
             <div class="field-group">
               <label>Pre Procurement Conference?</label>
@@ -149,6 +188,31 @@
       <!-- STEP 3: Funding Details -->
       <div id="step-3" class="hidden">
         <div class="form-single-column">
+          <!-- Procurement Strategies and Tools -->
+          <div class="field-group">
+            <label>Procurement Strategies and Tools</label>            
+            <div class="custom-multi-select">
+              <div class="select-box" id="strategiesTrigger">
+                <div id="selectedTags" class="selected-tags-container">
+                  <span class="placeholder">Select strategies...</span>
+                </div>
+                <img src="images/vector-43.svg" class="custom-chevron">
+              </div>
+
+              <div class="options-list hidden" id="strategiesMenu">
+                <div class="option" data-value="lca">Life Cycle Assessment (LCA) and LCCA</div>
+                <div class="option" data-value="sub">Subcontracting</div>
+                <div class="option" data-value="multi">Multi-Year Contracting</div>
+                <div class="option" data-value="design">Design-and-Build Scheme (Infra)</div>
+                <div class="option" data-value="agent">Engagement of a Procurement Agent</div>
+                <div class="option" data-value="frame">Use of Framework Agreement</div>
+                <div class="option" data-value="pool">Pooled Procurement Section 17</div>
+                <div class="option" data-value="renew">Renewal of Regular/Recurring Services</div>
+                <div class="option" data-value="ware">Warehousing and Inventory Activities</div>
+              </div>
+            </div>
+          </div>
+
           <div class="field-group"><label>Remarks</label><textarea placeholder="Add notes..." style="height: 180px;"></textarea></div>
           <div class="field-group">
             <label>Attached Supporting Documents</label>

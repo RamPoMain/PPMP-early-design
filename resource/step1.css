@@ -11,9 +11,17 @@ select { appearance: none; padding-right: 40px; }
   width: 10px; pointer-events: none;
 }
 
-.error-state select { border-color: var(--error-red) !important; background-color: #fef2f2 !important; }
+.error-state select {
+  border: 1px solid #dc2626 !important;
+  background-color: #fef2f2 !important;
+}
+
 .text-45 { color: var(--error-red); font-size: 11px; margin-top: 4px; }
 textarea { min-height: 120px; resize: vertical; }
+
+.hidden {
+  display: none !important;
+}
 
 .track-4 { background: rgba(0,0,0,0.1); height: 6px; border-radius: 10px; overflow: hidden; }
 .filled-5 { background: #0088ff; height: 100%; transition: 0.3s; }

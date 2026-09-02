@@ -2,7 +2,7 @@
   --font-family-roboto: 'Roboto', sans-serif;
   --font-family-inter: 'Inter', sans-serif;
   --dict-dark-blue: #003366;
-  --dict-beige: #f2ecd3;
+  --dict-beige: #white;
   --text-gray: #6d7280;
   --text-dark: #49454f;
   --error-red: #dc2626;
@@ -71,7 +71,7 @@ body {
 
 /* SHARED CARD DESIGN */
 .main-card-container {
-  background-color: #d9d9d9;
+  background-color: #f2f2f2;
   width: 100%;
   max-width: 1000px;
   padding: 80px 50px 50px 50px;
@@ -92,6 +92,11 @@ body {
   text-align: center;
 }
 
+a {
+    text-decoration: none;
+    color: var(--text-dark);
+    transition: 0.2s;
+}
 /* SHARED FORM ELEMENTS */
 .field-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; width: 100%; }
 label { font-size: 14px; font-weight: 600; color: var(--text-dark); }
