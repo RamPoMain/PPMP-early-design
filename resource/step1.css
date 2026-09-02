@@ -25,3 +25,30 @@ textarea { min-height: 120px; resize: vertical; }
 
 .track-4 { background: rgba(0,0,0,0.1); height: 6px; border-radius: 10px; overflow: hidden; }
 .filled-5 { background: #0088ff; height: 100%; transition: 0.3s; }
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.select-wrapper { position: relative; width: 100%; }
+select { appearance: none; padding-right: 40px; }
+.custom-chevron {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  width: 10px; pointer-events: none;
+}
+
+.error-state select {
+  border: 1px solid #dc2626 !important;
+  background-color: #fef2f2 !important;
+}
+
+.text-45 { color: var(--error-red); font-size: 11px; margin-top: 4px; }
+textarea { min-height: 120px; resize: vertical; }
+
+.hidden {
+  display: none !important;
+}
+
+.track-4 { background: rgba(0,0,0,0.1); height: 6px; border-radius: 10px; overflow: hidden; }
+.filled-5 { background: #0088ff; height: 100%; transition: 0.3s; }

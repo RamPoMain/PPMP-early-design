@@ -48,88 +48,79 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+let selectedStrategies = [];
+
 document.addEventListener('DOMContentLoaded', function() {
     const trigger = document.getElementById('strategiesTrigger');
     const menu = document.getElementById('strategiesMenu');
-    const options = document.querySelectorAll('.option');
     const tagsContainer = document.getElementById('selectedTags');
-    
-    let selectedData = []; // To store { value, text } objects
+    const options = document.querySelectorAll('.option');
 
-    // Toggle menu
-    trigger.addEventListener('click', function(e) {
-        menu.classList.toggle('hidden');
-        e.stopPropagation();
-    });
-
-    // Handle Option Clicks
-    options.forEach(option => {
-        option.addEventListener('click', function(e) {
-            const val = this.getAttribute('data-value');
-            const text = this.innerText;
-            
-            // Check if already selected
-            const index = selectedData.findIndex(item => item.value === val);
-
-            if (index > -1) {
-                // Remove if already there
-                this.classList.remove('selected');
-                selectedData.splice(index, 1);
-            } else {
-                // Add if new
-                this.classList.add('selected');
-                selectedData.push({ value: val, text: text });
-            }
-
-            renderTags();
-            e.stopPropagation();
-        });
-    });
-
-    // Function to draw the tags in the box
-    function renderTags() {
-        if (selectedData.length === 0) {
-            tagsContainer.innerHTML = '<span class="placeholder">Select strategies...</span>';
-        } else {
-            tagsContainer.innerHTML = ''; // Clear container
-            selectedData.forEach(item => {
-                const tag = document.createElement('span');
-                tag.className = 'tag';
-                tag.innerText = item.text;
-                tagsContainer.appendChild(tag);
-            });
-        }
+    // 1. Toggle Menu
+    if (trigger) {
+        trigger.onclick = function(e) {
+            e.stopPropagation(); // Prevents the document click listener from closing it instantly
+            menu.classList.toggle('hidden');
+        };
     }
 
-    // Close menu when clicking outside
-    document.addEventListener('click', function() {
-        menu.classList.add('hidden');
+    // 2. Handle Option Clicks
+    options.forEach(opt => {
+        opt.onclick = function(e) {
+            e.stopPropagation(); // Keep menu open when selecting
+            const val = this.getAttribute('data-value');
+            const text = this.innerText;
+
+            this.classList.toggle('selected');
+
+            if (this.classList.contains('selected')) {
+                selectedStrategies.push({ val, text });
+            } else {
+                selectedStrategies = selectedStrategies.filter(item => item.val !== val);
+            }
+
+            // Update the display tags
+            if (selectedStrategies.length === 0) {
+                tagsContainer.innerHTML = '<span class="placeholder">Select strategies...</span>';
+            } else {
+                tagsContainer.innerHTML = selectedStrategies.map(s => `<span class="tag">${s.text}</span>`).join('');
+            }
+        };
     });
+
+    // 3. Close menu if clicked anywhere else
+    document.addEventListener('click', function() {
+        if (menu) menu.classList.add('hidden');
+    });
+
+    // 4. Mode of Procurement Disappearing Error
+    const modeSelect = document.getElementById('modeOfProcurement');
+    if (modeSelect) {
+        modeSelect.onchange = function() {
+            if(this.value !== "") {
+                document.getElementById('modeWrapper').classList.remove('error-state');
+                document.getElementById('modeErrorMsg').classList.add('hidden');
+            }
+        };
+    }
 });
 
 function saveProcurementRequest() {
-    // 1. Collect the data from all steps
     const newRequest = {
-        id: Date.now(), // Unique ID for tracking
+        id: Date.now(),
         ppmp_no: document.getElementById('ppmp_no').value || "N/A",
-        project_title: "New Procurement Activity", // You can add a Title input to Step 1
-        end_user: document.getElementById('end_user').value || "N/A",
-        mode: document.getElementById('modeOfProcurement').value || "TBD",
-        budget: document.getElementById('budget_input')?.value || "0.00",
-        status: "Pending", // Default status
-        date_created: new Date().toLocaleDateString()
+        unit: document.getElementById('end_user_unit').value,
+        budget: document.getElementById('budget_input').value || "0.00",
+        mode: document.getElementById('modeOfProcurement').options[document.getElementById('modeOfProcurement').selectedIndex].text,
+        strategies: selectedStrategies.map(s => s.text),
+        status: "Pending",
+        date: new Date().toLocaleDateString()
     };
 
-    // 2. Get existing data from localStorage or start a new array
-    const existingRequests = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    records.push(newRequest);
+    localStorage.setItem('procurement_records', JSON.stringify(records));
 
-    // 3. Add the new request to the list
-    existingRequests.push(newRequest);
-
-    // 4. Save back to localStorage
-    localStorage.setItem('procurement_records', JSON.stringify(existingRequests));
-
-    // 5. Redirect to Dashboard
-    alert("Request Saved Successfully!");
-    window.location.href = "dashboard.html";
+    alert("Procurement Request Saved!");
+    window.location.href = "index.html"; // Go back to dashboard
 }
