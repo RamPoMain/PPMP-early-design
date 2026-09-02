@@ -1,39 +1,15 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const tableBody = document.getElementById('dashboard-table-body');
-    // Load from LocalStorage
     const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    document.getElementById('stat-total').innerText = records.length;
+    document.getElementById('stat-pending').innerText = records.filter(r => r.status === "Pending").length;
+    document.getElementById('stat-completed').innerText = records.filter(r => r.status === "Completed").length;
 
-    // 1. UPDATE SUMMARY CARDS
-    if (document.getElementById('stat-total')) {
-        document.getElementById('stat-total').innerText = records.length;
-        document.getElementById('stat-pending').innerText = records.filter(r => r.status === "Pending").length;
-        document.getElementById('stat-completed').innerText = records.filter(r => r.status === "Completed").length;
-    }
+    const tableBody = document.getElementById('dashboard-table-body');
+    tableBody.innerHTML = records.length === 0 ? '<tr><td colspan="5" style="text-align:center;">No records.</td></tr>' : '';
 
-    // 2. CLEAR PLACEHOLDER CONTENT
-    if (!tableBody) return;
-    tableBody.innerHTML = '';
-
-    // 3. HANDLE EMPTY STATE
-    if (records.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 30px; color: #666;">No procurement records found.</td></tr>';
-        return;
-    }
-
-    // 4. BUILD TABLE ROWS (Newest on top)
-    records.reverse().forEach(item => {
-        const row = document.createElement('tr');
-        
-        // We use .join(', ') to turn the strategies array into a readable string
-        const strategyString = item.strategies.length > 0 ? item.strategies.join(', ') : 'None';
-
-        row.innerHTML = `
-            <td>${item.ppmp_no}</td>
-            <td title="${strategyString}"><b>${item.unit}</b><br><small style="color: #888">${item.mode}</small></td>
-            <td>${item.date_filed}</td>
-            <td>PHP ${parseFloat(item.budget).toLocaleString()}</td>
-            <td><span class="badge pending">${item.status}</span></td>
-        `;
-        tableBody.appendChild(row);
+    [...records].reverse().forEach(req => {
+        const row = `<tr><td>${req.ppmp_no}</td><td>${req.end_user}</td><td>PHP ${req.budget}</td><td><span class="badge pending">${req.status}</span></td><td><button class="view-btn" onclick="openView(${req.id})">View Details</button></td></tr>`;
+        tableBody.innerHTML += row;
     });
-});s
+});
+function openView(id) { sessionStorage.setItem('view_record_id', id); window.location.href = 'page1.html'; }

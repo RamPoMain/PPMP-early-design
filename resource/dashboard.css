@@ -34,3 +34,20 @@
 .badge.pending { background: #fff7ed; color: #c2410c; }
 .badge.active { background: #f0f9ff; color: #0369a1; }
 .badge.completed { background: #f0fdf4; color: #15803d; }
+
+.view-btn {
+    background-color: transparent;
+    border: 1px solid #0088ff;
+    color: #0088ff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.view-btn:hover {
+    background-color: #0088ff;
+    color: white;
+}

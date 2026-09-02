@@ -1,61 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DICT Procurement - Dashboard</title>
-  <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="resource/base.css">
-  <link rel="stylesheet" href="resource/dashboard.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICT Procurement - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resource/base.css">
+    <link rel="stylesheet" href="resource/dashboard.css">
 </head>
 <body>
+    <aside class="sidebar">
+        <div class="sidebar-logo">DICT PROCUREMENT</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="nav-item active">Dashboard</a>
+            <a href="page1.html" class="nav-item" onclick="sessionStorage.removeItem('view_record_id')">New Request</a>
+            <a href="profile.html" class="nav-item">My Profile</a>
+        </nav>
+    </aside>
 
-  <aside class="sidebar">
-    <div class="sidebar-logo">DICT PROCUREMENT</div>
-    <nav class="sidebar-nav">
-      <a href="index.html" class="nav-item active">Dashboard</a>
-      <a href="page1.html" class="nav-item">New Request</a>
-      <a href="profile.html" class="nav-item">My Profile</a>
-    </nav>
-  </aside>
+    <main class="main-content">
+        <header class="header-container">
+            <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
+        </header>
 
-  <main class="main-content">
-    <header class="header-container">
-      <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
-    </header>
+        <div class="main-card-container">
+            <div class="title-tab-wrapper"><p class="text-9">PROCUREMENT DASHBOARD</p></div>
 
-    <div class="main-card-container">
-      <div class="title-tab-wrapper">
-        <p class="text-9">PROCUREMENT DASHBOARD</p>
-      </div>
+            <div class="dashboard-header">
+                <div class="welcome-msg">
+                    <h2>Welcome back, Juan</h2>
+                    <p>Manage and track your procurement requests here.</p>
+                </div>
+                <a href="page1.html" class="create-btn" onclick="sessionStorage.removeItem('view_record_id')">+ Create New Request</a>
+            </div>
 
-      <div class="dashboard-header">
-        <div class="welcome-msg">
-          <h2>Welcome back, Juan</h2>
-          <p>Manage and track your procurement requests here.</p>
+            <div class="stats-grid">
+                <div class="stat-card"><span class="stat-label">Total Requests</span><span id="stat-total" class="stat-value">0</span></div>
+                <div class="stat-card"><span class="stat-label">Pending</span><span id="stat-pending" class="stat-value">0</span></div>
+                <div class="stat-card"><span class="stat-label">Completed</span><span id="stat-completed" class="stat-value">0</span></div>
+            </div>
+
+            <div class="table-container">
+                <h3>Recent Procurement Activities</h3>
+                <table class="dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>PPMP No.</th>
+                            <th>Implementing Unit</th>
+                            <th>Budget</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body"></tbody>
+                </table>
+            </div>
         </div>
-        <a href="page1.html" class="create-btn">+ Create New Request</a>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card"><span class="stat-label">Active</span><span class="stat-value">12</span></div>
-        <div class="stat-card"><span class="stat-label">Pending</span><span class="stat-value">5</span></div>
-        <div class="stat-card"><span class="stat-label">Completed</span><span class="stat-value">28</span></div>
-      </div>
-
-      <div class="table-container">
-        <h3>Recent Procurement Activities</h3>
-        <table class="dashboard-table">
-          <thead>
-            <tr><th>PPMP No.</th><th>Project Title</th><th>Status</th></tr>
-          </thead>
-          <tbody id="dashboard-table-body">
-              <!-- Records will appear here -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </main>
-  <script src="scripts/dashboard-logic.js"></script>
+    </main>
+    <script src="scripts/dashboard-logic.js"></script>
 </body>
 </html>

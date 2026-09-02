@@ -1,207 +1,64 @@
-.form-single-column { max-width: 800px; margin: 0 auto; }
+/* Layout for Step 3 */
+.form-single-column {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
+/* Upload Zone Presentation Style */
 .upload-zone {
-  width: 100%; height: 200px;
-  border: 2px dashed #d2d5da; border-radius: 8px;
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  background: #f9fafb; cursor: pointer; transition: 0.3s;
+  width: 100%;
+  height: 160px;
+  background-color: #f9fafb;
+  border: 2px dashed #d2d5da;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  cursor: default;
 }
 
-.upload-zone:hover { border-color: #0088ff; background: #f0f7ff; }
-.upload-icon { font-size: 30px; margin-bottom: 10px; opacity: 0.5; }
-.upload-link { color: #0088ff; font-weight: 600; }
-.upload-subtext { font-size: 11px; color: var(--text-gray); margin-top: 8px; }
-
-/* Container for the custom dropdown */
-.custom-multi-select {
-    position: relative;
-    width: 100%;
+.upload-icon {
+  font-size: 30px;
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.5;
 }
 
-/* The box that looks like a normal input */
+.upload-text {
+  font-family: var(--font-family-inter);
+  color: #6d7280;
+  font-size: 14px;
+}
+
+.upload-link {
+  color: #0088ff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.upload-subtext {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 5px;
+}
+
+/* Custom Multi-Select Styles */
+.custom-multi-select { position: relative; width: 100%; }
 .select-box {
-    width: 100%;
-    padding: 12px;
-    background: #f9fafb;
-    border: 1px solid #d2d5da;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 14px;
+    width: 100%; padding: 12px; background: #f9fafb; border: 1px solid #d2d5da;
+    border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 48px;
 }
-
-/* The dropdown menu */
 .options-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    width: 100%;
-    background: white;
-    border: 1px solid #d2d5da;
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    max-height: 250px;
-    overflow-y: auto;
-    z-index: 100;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: absolute; top: 100%; left: 0; width: 100%; background: white;
+    border: 1px solid #d2d5da; border-top: none; max-height: 200px; overflow-y: auto; z-index: 100;
 }
-
-/* Container that holds the tags */
-.selected-tags-container {
-    display: flex;
-    flex-wrap: wrap; /* Allows tags to go to the next line if there are many */
-    gap: 6px;
-    flex: 1;
-}
-
-/* The individual Tag/Chip styling */
-.tag {
-    background-color: #e0f2fe; /* Very light DICT blue */
-    color: #0369a1; /* Darker blue text */
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    border: 1px solid #bae6fd;
-    display: inline-flex;
-    align-items: center;
-}
-
-.placeholder {
-    color: #6d7280;
-}
-
-/* Ensure the box grows with the tags */
-.select-box {
-    min-height: 48px; /* Standard height but can grow */
-    height: auto !important;
-}
-
-
-/* Individual options */
-.option {
-    padding: 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background 0.2s;
-}
-
-.option:hover {
-    background-color: #f0f7ff;
-}
-
-/* Highlighted state when clicked */
-.option.selected {
-    background-color: #0088ff !important;
-    color: white;
-}
-
-/* Scrollbar styling for a cleaner look */
-.options-list::-webkit-scrollbar { width: 6px; }
-.options-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
-.form-single-column { max-width: 800px; margin: 0 auto; }
-
-.upload-zone {
-  width: 100%; height: 200px;
-  border: 2px dashed #d2d5da; border-radius: 8px;
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  background: #f9fafb; cursor: pointer; transition: 0.3s;
-}
-
-.upload-zone:hover { border-color: #0088ff; background: #f0f7ff; }
-.upload-icon { font-size: 30px; margin-bottom: 10px; opacity: 0.5; }
-.upload-link { color: #0088ff; font-weight: 600; }
-.upload-subtext { font-size: 11px; color: var(--text-gray); margin-top: 8px; }
-
-/* Container for the custom dropdown */
-.custom-multi-select {
-    position: relative;
-    width: 100%;
-    z-index: 100; /* Keeps it above other fields */
-}
-
-/* The box that looks like a normal input */
-.select-box {
-    width: 100%;
-    padding: 12px;
-    background: #f9fafb;
-    border: 1px solid #d2d5da;
-    border-radius: 6px;
-    cursor: pointer !important; /* Forces the pointer cursor */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 14px;
-    position: relative;
-    z-index: 101;
-}
-
-
-/* The dropdown menu */
-.options-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    width: 100%;
-    background: white !important;
-    border: 1px solid #d2d5da;
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    max-height: 250px;
-    overflow-y: auto;
-    z-index: 999; /* Higher than everything else in the card */
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-/* Container that holds the tags */
-.selected-tags-container {
-    pointer-events: none; /* Allows click to go through to the parent .select-box */
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-}
-
-/* The individual Tag/Chip styling */
-.tag {
-    pointer-events: auto; /* Makes tags themselves interactive if needed */
-    background: #e0f2fe;
-    color: #0369a1;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-.placeholder {
-    color: #6d7280;
-}
-
-/* Ensure the box grows with the tags */
-.select-box {
-    min-height: 48px; /* Standard height but can grow */
-    height: auto !important;
-}
-
-
-/* Individual options */
-.option {
-    padding: 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background 0.2s;
-}
-
-.option:hover {
-    background-color: #f0f7ff;
-}
-
-/* Highlighted state when clicked */
-.option.selected {
-    background-color: #0088ff !important;
-    color: white;
-}
-
-/* Scrollbar styling for a cleaner look */
-.options-list::-webkit-scrollbar { width: 6px; }
-.options-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+.option { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.option:hover { background: #f0f7ff; }
+.option.selected { background: #0088ff !important; color: white; }
+.selected-tags-container { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.placeholder { color: #9ca3af; }
