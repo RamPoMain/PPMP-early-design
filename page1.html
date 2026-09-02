@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Procurement Request</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="resource/base.css">
+  <link rel="stylesheet" href="resource/step1.css">
+  <link rel="stylesheet" href="resource/step2.css">
+  <link rel="stylesheet" href="resource/step3.css">
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">DICT PROCUREMENT</div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item">Dashboard</a>
+      <a href="page1.html" class="nav-item active">New Request</a>
+      <a href="profile.html" class="nav-item">My Profile</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="header-container">
+      <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
+    </header>
+
+    <div class="main-card-container">
+      <div class="title-tab-wrapper">
+        <p id="page-title" class="text-9">PROCUREMENT PROJECT DETAILS</p>
+      </div>
+
+      <div class="progress-section">
+        <div class="track-4" style="width: 60%; margin: 20px auto;">
+          <div id="progress-fill" class="filled-5" style="width: 15%; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Procurement Project Details -->
+      <div id="step-1">
+        <form class="form-grid">
+          <!-- Left Column -->
+          <div class="form-column">
+            <div class="field-group">
+              <label>PPMP Number</label>
+              <input id="ppmp_no" type="text" placeholder="ex. 1">
+            </div>
+            <div class="field-group">
+              <label>Is Indicative or Final?</label>
+              <div class="select-wrapper">
+                <select id="is_indicative"><option>Indicative</option><option>Final</option></select>
+                <img src="images/vector-19.svg" class="custom-chevron">
+              </div>
+            </div>
+            <div class="field-group">
+              <label>End-User or Implementing Unit</label>
+              <input id="end_user" type="text" placeholder="Input">
+            </div>
+            <div class="field-group">
+              <label>Fiscal Year</label>
+              <input id="fiscal_year" type="text" placeholder="Field text goes here">
+            </div>
+            <div class="field-group">
+              <label>Type of Project to be Procured</label>
+              <div class="select-wrapper">
+                <select id="project_type"><option>Consulting Services</option><option>Goods</option><option>Infrastructure</option></select>
+                <img src="images/vector-33.svg" class="custom-chevron">
+              </div>
+            </div>
+            <div class="field-group">
+              <label>End-User or Implementing Unit</label>
+              <div class="select-wrapper">
+                <select id="end_user_unit"><option>ILCDB</option><option>FPIAP</option></select>
+                <img src="images/vector-33.svg" class="custom-chevron">
+              </div>
+            </div>
+          </div>
+          <!-- Right Column -->
+          <div class="form-column">
+            <div class="field-group">
+              <label>Recommended Mode of Procurement</label>
+              <div id="modeWrapper" class="select-wrapper error-state">
+                <select id="modeOfProcurement" required>
+                  <option value="" disabled selected>Select mode...</option>
+                  
+                  <optgroup label="Standard Mode">
+                    <option value="competitive_bidding">Competitive Bidding</option>
+                  </optgroup>
+
+                  <optgroup label="Alternative Modes">
+                    <option value="limited_source">Limited Source Bidding</option>
+                    <option value="direct_contracting">Direct Contracting</option>
+                    <option value="repeat_order">Repeat Order</option>
+                    <option value="shopping">Shopping</option>
+                    <option value="direct_acquisition">Direct Acquisition (New under RA 12009)</option>
+                    <option value="competitive_dialogue">Competitive Dialogue (New under RA 12009)</option>
+                    <option value="unsolicited_offer">Unsolicited Offer with Comparative Bidding</option>
+                  </optgroup>
+
+                  <optgroup label="Negotiated Procurement (Specific Cases)">
+                    <option value="neg_emergency">Two Failed Biddings</option>
+                    <option value="neg_emergency">Emergency Cases</option>
+                    <option value="neg_takeover">Take-over of Contracts</option>
+                    <option value="neg_adjacent">Adjacent or Contiguous</option>
+                    <option value="neg_agency">Agency-to-Agency</option>
+                    <option value="neg_scientific">Scientific, Scholarly or Artistic Work</option>
+                    <option value="neg_highly_technical">Highly Technical Consultants</option>
+                    <option value="neg_svp">Small Value Procurement (SVP)</option>
+                    <option value="neg_lease">Lease of Real Property and Venue</option>
+                    <option value="neg_ngo">NGO Participation</option>
+                    <option value="neg_community">Community Participation</option>
+                    <option value="neg_retail">Direct Retail Purchase (Fuel, Airline Tickets, etc.)</option>
+                  </optgroup>
+                </select>
+                <!-- Reusing your custom chevron icon -->
+                <img src="images/vector-43.svg" class="custom-chevron">
+              </div>
+              <p id="modeErrorMsg" class="text-45">Must Select Mode of Procurement</p>
+            </div>
+
+            <div class="field-group">
+              <label>Pre Procurement Conference?</label>
+              <div class="select-wrapper">
+                <select id="pre_procurement_conference"><option>No</option><option>Yes</option></select>
+                <img src="images/vector-51.svg" class="custom-chevron">
+              </div>
+            </div>
+            <div class="field-group">
+              <label>Quantity and Size of the Project</label>
+              <textarea id="quantity_size" placeholder="Message text goes here" style="height: 150px;"></textarea>
+            </div>
+          </div>
+        </form>
+
+        <div class="footer-actions">
+          <a href="index.html" class="back-btn">&larr; Back to Dashboard</a>
+          <button class="next-btn" onclick="showNextStep()">Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Projected Timeline -->
+      <div id="step-2" class="hidden">
+        <form class="form-grid">
+          <div class="form-column">
+            <div class="field-group">
+              <label>Start of Procurement Activity</label>
+              <div class="input-with-icon">
+                <span class="calendar-icon">📅</span>
+                <input id="procurement_start" type="date" class="calendar-input" placeholder="MM/DD">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label>End of Procurement Activity</label>
+              <div class="input-with-icon">
+                <span class="calendar-icon">📅</span>
+                <input id="procurement_end" type="date" class="calendar-input" placeholder="MM/DD">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label>Expected Delivery/ Implementation Period</label>
+              <div class="input-with-icon">
+                <span class="calendar-icon">📅</span>
+                <input id="delivery_period" type="date" class="calendar-input" placeholder="MM/DD">
+              </div>
+            </div>
+          </div>
+          <!-- Right Column -->
+          <div class="form-column">
+            <div class="field-group">
+              <label>Source of Funds</label>
+              <input id="source_of_funds" type="text" placeholder="Field text goes here">
+            </div>
+            <div class="field-group">
+              <label>Estimated Budget / Authorized Budgetary Allocation</label>
+              <div class="input-with-prefix">
+                <span class="prefix">PHP</span>
+                <input id="budget_input" type="text">
+              </div>
+            </div>
+          </div>
+        </form>
+        <div class="footer-actions">
+          <button class="back-btn" onclick="showStep1()">&larr; Back</button>
+          <button class="next-btn" onclick="showStep3()">Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Funding Details -->
+      <div id="step-3" class="hidden">
+        <div class="form-single-column">
+          <!-- Procurement Strategies and Tools -->
+          <div class="field-group">
+            <label>Procurement Strategies and Tools</label>            
+            <div id="procurement_strategies" class="custom-multi-select">
+              <div class="select-box" id="strategiesTrigger">
+                <div id="selectedTags" class="selected-tags-container">
+                  <span class="placeholder">Select strategies...</span>
+                </div>
+                <img src="images/vector-43.svg" class="custom-chevron">
+              </div>
+
+              <div class="options-list hidden" id="strategiesMenu">
+                <div class="option" data-value="lca">Life Cycle Assessment (LCA) and LCCA</div>
+                <div class="option" data-value="sub">Subcontracting</div>
+                <div class="option" data-value="multi">Multi-Year Contracting</div>
+                <div class="option" data-value="design">Design-and-Build Scheme (Infra)</div>
+                <div class="option" data-value="agent">Engagement of a Procurement Agent</div>
+                <div class="option" data-value="frame">Use of Framework Agreement</div>
+                <div class="option" data-value="pool">Pooled Procurement Section 17</div>
+                <div class="option" data-value="renew">Renewal of Regular/Recurring Services</div>
+                <div class="option" data-value="ware">Warehousing and Inventory Activities</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group"><label>Remarks</label><textarea id="remarks" placeholder="Add notes..." style="height: 180px;"></textarea></div>
+          <div class="field-group">
+            <label>Attached Supporting Documents</label>
+            <div class="upload-zone">
+              <p class="upload-text">Drop here to attach or <span class="upload-link">upload</span></p>
+              <p class="upload-subtext">Max size: 5GB</p>
+            </div>
+          </div>
+        </div>
+        <div class="footer-actions">
+          <button class="back-btn" onclick="showStep2()">&larr; Back</button>
+          <button type="button" class="next-btn" onclick="saveProcurementRequest()">Finish &rarr;</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+  <script src="scripts/script.js"></script>
+  <script src="scripts/form-logic.js"></script>
+</body>
+</html>
