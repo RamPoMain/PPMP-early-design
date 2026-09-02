@@ -109,6 +109,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #0088ff
 .hidden { display: none !important; }
 .footer-actions { display: flex; justify-content: flex-end; margin-top: 30px; gap: 20px; }
 
+.form-single-column {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+
 /* BUTTONS */
 .next-btn, .back-btn {
   background: none; border: none; font-size: 16px; font-weight: 600; cursor: pointer;
