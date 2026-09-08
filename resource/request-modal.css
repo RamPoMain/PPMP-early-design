@@ -1,0 +1,362 @@
+/* ============================================================
+   REQUEST MODAL — DARK THEME OVERRIDES
+   step1.css / step2.css / step3.css provide structure (grids,
+   positioning, the multi-select mechanics, upload zone layout).
+   Everything here only touches color so the form reads correctly
+   on the dashboard's dark background.
+   ============================================================ */
+
+/* CSS custom properties consumed by step1.css/step3.css
+   (--error-red, --text-gray, --font-family-inter) are redefined
+   here, scoped to the modal, so every rule that already references
+   them via var() picks up dark-appropriate values automatically. */
+.db-modal-overlay {
+    --error-red: #f87171;
+    --text-gray: #8b94a8;
+    --font-family-inter: 'Inter', 'Roboto', sans-serif;
+}
+
+/* ---------------- Overlay / panel chrome ---------------- */
+
+.db-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 8, 20, 0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px;
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.db-modal-overlay.hidden { display: none; }
+
+.db-modal {
+    position: relative;
+    width: 100%;
+    max-width: 940px;
+    background: var(--db-card, #111A2E);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    border-radius: 16px;
+    padding: 34px 38px 26px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    color: var(--db-text, #E7EAF3);
+    font-family: 'Inter', 'Roboto', sans-serif;
+    margin-bottom: 40px;
+}
+
+.db-modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    background: var(--db-card-alt, #0F172A);
+    color: var(--db-text-dim, #8B94A8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.db-modal-close:hover {
+    color: var(--db-text, #E7EAF3);
+    border-color: var(--db-accent, #3B82F6);
+}
+
+.db-modal .text-9 {
+    color: var(--db-text, #E7EAF3);
+    padding-right: 30px;
+}
+
+.db-modal label {
+    color: var(--db-text-dim, #8B94A8);
+    font-weight: 600;
+    font-size: 12.5px;
+    display: block;
+    margin-bottom: 6px;
+}
+
+/* ---------------- Form fields ---------------- */
+
+.db-modal input[type="text"],
+.db-modal input[type="date"],
+.db-modal select,
+.db-modal textarea {
+    background: var(--db-card-alt, #0F172A);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text, #E7EAF3);
+    border-radius: 8px;
+    padding: 11px 14px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 13.5px;
+}
+
+.db-modal input::placeholder,
+.db-modal textarea::placeholder {
+    color: var(--db-text-faint, #5B6478);
+}
+
+.db-modal input:focus,
+.db-modal select:focus,
+.db-modal textarea:focus {
+    outline: none;
+    border-color: var(--db-accent, #3B82F6);
+}
+
+/* Chevron / calendar icon assets are drawn for a light background —
+   invert them so they stay visible here. */
+.db-modal .custom-chevron {
+    filter: invert(1) brightness(1.7);
+}
+
+.db-modal .prefix {
+    color: var(--db-text-dim, #8B94A8);
+}
+
+/* Required-field / mismatch error state */
+.db-modal .error-state input,
+.db-modal .error-state select,
+.db-modal .error-state textarea {
+    background-color: rgba(248, 113, 113, 0.1) !important;
+    border-color: #f87171 !important;
+    color: var(--db-text, #E7EAF3) !important;
+}
+
+.db-modal .error-state .upload-zone,
+.db-modal .error-state .select-box {
+    background-color: rgba(248, 113, 113, 0.1) !important;
+    border-color: #f87171 !important;
+}
+
+.db-modal .mode-hint {
+    color: var(--db-text-faint, #5B6478);
+}
+
+/* ---------------- Progress bar ---------------- */
+
+.db-modal .track-4 {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.db-modal .filled-5 {
+    background: var(--db-accent, #3B82F6);
+}
+
+/* ---------------- Multi-select (strategies) ---------------- */
+
+.db-modal .select-box {
+    background: var(--db-card-alt, #0F172A);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text, #E7EAF3);
+}
+
+.db-modal .options-list {
+    background: var(--db-card, #111A2E);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text, #E7EAF3);
+}
+
+.db-modal .option {
+    border-bottom: 1px solid var(--db-border, rgba(255,255,255,0.08));
+}
+
+.db-modal .option:hover {
+    background: var(--db-card-alt, #0F172A);
+}
+
+.db-modal .option.selected {
+    background: var(--db-accent, #3B82F6) !important;
+    color: #fff;
+}
+
+.db-modal .tag {
+    background: rgba(59, 130, 246, 0.16);
+    color: #93C5FD;
+}
+
+.db-modal .placeholder {
+    color: var(--db-text-faint, #5B6478);
+}
+
+/* ---------------- Upload zone ---------------- */
+
+.db-modal .upload-zone {
+    background-color: var(--db-card-alt, #0F172A);
+    border-color: var(--db-border, rgba(255,255,255,0.08));
+}
+
+.db-modal .upload-zone.drag-over {
+    background-color: rgba(59, 130, 246, 0.12);
+    border-color: var(--db-accent, #3B82F6);
+}
+
+.db-modal .upload-zone.has-file {
+    border-color: var(--db-accent, #3B82F6);
+}
+
+.db-modal .uploaded-file-item {
+    background: var(--db-card-alt, #0F172A);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text, #E7EAF3);
+}
+
+.db-modal .uploaded-file-size {
+    color: var(--db-text-faint, #5B6478);
+}
+
+/* ---------------- Footer buttons ---------------- */
+
+.db-modal .footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--db-border, rgba(255,255,255,0.08));
+}
+
+.db-modal .back-btn {
+    background: transparent;
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text-dim, #8B94A8);
+    padding: 10px 18px;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.db-modal .back-btn:hover {
+    color: var(--db-text, #E7EAF3);
+    border-color: var(--db-accent, #3B82F6);
+}
+
+.db-modal .next-btn {
+    background: var(--db-accent, #3B82F6);
+    border: none;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.db-modal .next-btn:hover {
+    background: #2563EB;
+}
+
+/* ---------------- Toast ---------------- */
+
+.db-toast {
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    background: var(--db-card, #111A2E);
+    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
+    color: var(--db-text, #E7EAF3);
+    padding: 13px 20px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    font-size: 13.5px;
+    font-weight: 500;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    z-index: 1100;
+    max-width: 320px;
+}
+
+.db-toast.show { opacity: 1; transform: translateY(0); }
+
+/* ---------------- Welcome card CTA ---------------- */
+
+.db-welcome-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
+.db-cta-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--db-accent, #3B82F6);
+    color: #fff;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 13.5px;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.db-cta-btn:hover {
+    background: #2563EB;
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 640px) {
+    .db-modal { padding: 26px 20px 20px; }
+    .db-modal .footer-actions { flex-direction: column-reverse; gap: 10px; }
+    .db-modal .back-btn,
+    .db-modal .next-btn { width: 100%; text-align: center; }
+}
+
+/* Remove the white background from the title wrapper in dark mode */
+.db-modal .title-tab-wrapper {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    justify-content: center;
+}
+
+/* Ensure the text inside is clearly visible */
+.db-modal .text-9 {
+    background: transparent !important;
+    color: var(--db-text, #E7EAF3) !important;
+    text-align: center;
+    width: 100%;
+}
+
+.db-modal .title-tab-wrapper {
+    background: transparent !important;
+    border: none !important;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.db-modal .text-9 {
+    padding-right: 0 !important; /* Removes the offset that was in your original CSS */
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 14px;
+    color: var(--db-text, #E7EAF3);
+    text-align: center;
+}
+
+.db-modal .title-tab-wrapper {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    justify-content: center;
+}
