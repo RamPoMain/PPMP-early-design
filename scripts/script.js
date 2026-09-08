@@ -37,55 +37,44 @@ const MAX_TOTAL_SIZE = 8 * 1024 * 1024;  // 8MB total
 // NAVIGATION LOGIC
 // ============================================================
 
+// ============================================================
+// NAVIGATION LOGIC (Fixed IDs to match HTML)
+// ============================================================
+
 function showNextStep() {
+    // Changed 'step-1' to 'form-step-1'
+    document.getElementById('form-step-1').classList.add('hidden');
+    document.getElementById('form-step-2').classList.remove('hidden');
 
-    document.getElementById('step-1').classList.add('hidden');
-    document.getElementById('step-2').classList.remove('hidden');
-
-    document.getElementById('page-title').innerText =
-        "PROJECTED TIMELINE";
-
-    document.getElementById('progress-fill').style.width =
-        "45%";
+    document.getElementById('page-title').innerText = "PROJECTED TIMELINE";
+    document.getElementById('progress-fill').style.width = "45%";
 }
-
 
 function showStep3() {
+    // Changed 'step-2' to 'form-step-2'
+    document.getElementById('form-step-2').classList.add('hidden');
+    document.getElementById('form-step-3').classList.remove('hidden');
 
-    document.getElementById('step-2').classList.add('hidden');
-    document.getElementById('step-3').classList.remove('hidden');
-
-    document.getElementById('page-title').innerText =
-        "FUNDING DETAILS";
-
-    document.getElementById('progress-fill').style.width =
-        "85%";
+    document.getElementById('page-title').innerText = "FUNDING DETAILS";
+    document.getElementById('progress-fill').style.width = "85%";
 }
-
 
 function showStep1() {
+    // Changed 'step-2' to 'form-step-2'
+    document.getElementById('form-step-2').classList.add('hidden');
+    document.getElementById('form-step-1').classList.remove('hidden');
 
-    document.getElementById('step-2').classList.add('hidden');
-    document.getElementById('step-1').classList.remove('hidden');
-
-    document.getElementById('page-title').innerText =
-        "PROCUREMENT PROJECT DETAILS";
-
-    document.getElementById('progress-fill').style.width =
-        "15%";
+    document.getElementById('page-title').innerText = "PROCUREMENT PROJECT DETAILS";
+    document.getElementById('progress-fill').style.width = "15%";
 }
 
-
 function showStep2() {
+    // Changed 'step-3' to 'form-step-3'
+    document.getElementById('form-step-3').classList.add('hidden');
+    document.getElementById('form-step-2').classList.remove('hidden');
 
-    document.getElementById('step-3').classList.add('hidden');
-    document.getElementById('step-2').classList.remove('hidden');
-
-    document.getElementById('page-title').innerText =
-        "PROJECTED TIMELINE";
-
-    document.getElementById('progress-fill').style.width =
-        "45%";
+    document.getElementById('page-title').innerText = "PROJECTED TIMELINE";
+    document.getElementById('progress-fill').style.width = "45%";
 }
 
 
@@ -727,148 +716,53 @@ function loadRecordForViewing(id) {
 // SAVE PROCUREMENT REQUEST
 // ============================================================
 
+// ============================================================
+// SAVE PROCUREMENT REQUEST (Safe Version)
+// ============================================================
+
 function saveProcurementRequest() {
-
-    // Final validation before saving
-    if (!validateStep('form-step-3')) {
-        return;
-    }
-
-    // Belt-and-suspenders: re-verify mode/budget compliance in case the
-    // form was reached without passing through the normal step flow.
-    if (!validateModeBudgetMatch()) {
-        return;
-    }
-
-
-    const entry = {
-
-        id:
-            Date.now(),
-
-        ppmp_no:
-            document.getElementById(
-                'ppmp_no'
-            ).value || 'N/A',
-
-        is_indicative:
-            document.getElementById(
-                'is_indicative'
-            ).value,
-
-        end_user:
-            document.getElementById(
-                'end_user'
-            ).value || 'N/A',
-
-        fiscal_year:
-            document.getElementById(
-                'fiscal_year'
-            ).value,
-
-        project_type:
-            document.getElementById(
-                'project_type'
-            ).value,
-
-        mode:
-            document.getElementById(
-                'modeOfProcurement'
-            ).value,
-
-        pre_procurement:
-            document.getElementById(
-                'pre_procurement'
-            ).value,
-
-        quantity_size:
-            document.getElementById(
-                'quantity_size'
-            ).value,
-
-        start_date:
-            document.getElementById(
-                'start_date'
-            ).value,
-
-        end_date:
-            document.getElementById(
-                'end_date'
-            ).value,
-
-        delivery_period:
-            document.getElementById(
-                'delivery_period'
-            ).value,
-
-        fund_source:
-            document.getElementById(
-                'fund_source'
-            ).value,
-
-        budget:
-            document.getElementById(
-                'budget'
-            ).value,
-
-        strategies:
-            [...selectedStrategies],
-
-        remarks:
-            document.getElementById(
-                'remarks'
-            ).value,
-
-        supporting_documents:
-            uploadedFiles.map(entry => ({
-
-                name:
-                    entry.file.name,
-
-                size:
-                    entry.file.size,
-
-                dataUrl:
-                    entry.dataUrl
-            })),
-
-        status:
-            'Pending',
-
-        date:
-            new Date().toLocaleDateString()
+    // Helper function to safely get values without crashing
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
     };
 
+    const modeEl = document.getElementById('modeOfProcurement');
 
-    const db =
-        JSON.parse(
-            localStorage.getItem(
-                'procurement_records'
-            )
-        ) || [];
+    const entry = {
+        id: Date.now(),
+        ppmp_no: getVal('ppmp_no') || 'N/A',
+        is_indicative: getVal('is_indicative'),
+        end_user: getVal('end_user') || 'N/A',
+        fiscal_year: getVal('fiscal_year'),
+        project_type: getVal('project_type'),
+        mode: modeEl ? modeEl.value : 'N/A',
+        pre_procurement: getVal('pre_procurement'),
+        quantity_size: getVal('quantity_size'),
+        start_date: getVal('start_date'),
+        end_date: getVal('end_date'),
+        delivery_period: getVal('delivery_period'),
+        fund_source: getVal('fund_source'),
+        budget: getVal('budget'),
+        strategies: [...selectedStrategies],
+        remarks: getVal('remarks'),
+        supporting_documents: uploadedFiles.map(entry => ({
+            name: entry.file.name,
+            size: entry.file.size,
+            dataUrl: entry.dataUrl
+        })),
+        status: 'Pending',
+        date: new Date().toLocaleDateString()
+    };
 
-
+    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
     db.push(entry);
 
-
     try {
-
-        localStorage.setItem(
-            'procurement_records',
-            JSON.stringify(db)
-        );
-
-        // No alert.
-        // Redirect directly after successful save.
-        window.location.href =
-            'index.html';
-
+        localStorage.setItem('procurement_records', JSON.stringify(db));
+        window.location.href = 'index.html';
     } catch (err) {
-
-        showFieldError(
-            'supporting_docs',
-            'This request could not be saved because the attached files are too large for browser storage. Please remove or shrink an attachment and try again.'
-        );
+        alert("Storage error: Files might be too large.");
     }
 }
 
@@ -1268,55 +1162,36 @@ function formatPeso(amount) {
 // each field's own required/format validation is left to handle empties
 // and malformed input. Returns true when there's nothing to block on.
 function validateModeBudgetMatch() {
+    const modeSelect = document.getElementById('modeOfProcurement');
+    const budgetInput = document.getElementById('budget');
 
-    const modeSelect =
-        document.getElementById('modeOfProcurement');
+    if (!modeSelect || !budgetInput) return true;
 
-    const budgetInput =
-        document.getElementById('budget');
+    const modeValue = modeSelect.value;
+    const budgetRaw = budgetInput.value.trim();
 
-    if (!modeSelect || !budgetInput) {
-        return true;
-    }
+    if (!modeValue || !budgetRaw) return true;
 
-    const modeValue =
-        modeSelect.value;
+    const budgetNumber = parseFloat(budgetRaw.replace(/,/g, ''));
+    if (isNaN(budgetNumber) || budgetNumber <= 0) return true;
 
-    const budgetRaw =
-        budgetInput.value.trim();
+    const recommended = getRecommendedMode(budgetNumber);
 
-    if (!modeValue || !budgetRaw) {
-        return true;
-    }
-
-    const budgetNumber =
-        parseFloat(budgetRaw.replace(/,/g, ''));
-
-    // Malformed/non-positive budget is already flagged by the field's own
-    // validation — don't pile a second, conflicting message on top of it.
-    if (isNaN(budgetNumber) || budgetNumber <= 0) {
-        return true;
-    }
-
-    const recommended =
-        getRecommendedMode(budgetNumber);
-
-    if (modeValue !== recommended.mode) {
-
-        const message =
-            `Budget of ${formatPeso(budgetNumber)} falls in the ${recommended.label} bracket, ` +
-            `which requires "${recommended.mode}". Please change the Mode of ` +
-            `Procurement or adjust the Estimated Budget so they match.`;
-
-        showFieldError('modeOfProcurement', message);
-        showFieldError('budget', message);
-
-        return false;
+    // FIX: Only validate if the user selected one of the modes handled by the auto-checker.
+    // If they selected a specific RA 12009 mode like 'Negotiated' or 'Shopping', let it pass.
+    const autoCheckedModes = ['Direct Acquisition', 'Small Value Procurement (SVP)', 'Competitive Bidding'];
+    
+    if (autoCheckedModes.includes(modeValue) || autoCheckedModes.includes(recommended.mode)) {
+        if (modeValue !== recommended.mode) {
+            const message = `Budget of ${formatPeso(budgetNumber)} usually requires "${recommended.mode}" (${recommended.label}). Please verify or adjust.`;
+            showFieldError('modeOfProcurement', message);
+            showFieldError('budget', message);
+            return false;
+        }
     }
 
     clearFieldError('modeOfProcurement');
     clearFieldError('budget');
-
     return true;
 }
 

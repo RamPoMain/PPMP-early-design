@@ -17,7 +17,6 @@
 .badge.active { background: #f0f9ff; color: #0369a1; }
 .badge.completed { background: #f0fdf4; color: #15803d; }
 .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-.welcome-msg h2 { color: var(--text-dark); margin-bottom: 5px; }
 .create-btn { background: #0088ff; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; transition: 0.2s; }
 .create-btn:hover { background: #0066cc; }
 
@@ -50,4 +49,141 @@
 .view-btn:hover {
     background-color: #0088ff;
     color: white;
+}
+
+/* MODAL STYLES */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.5); /* Semi-transparent dark background */
+    backdrop-filter: blur(8px); /* THE BLUR EFFECT */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    transition: all 0.3s ease;
+}
+
+.modal-card {
+    background: white;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+    padding: 20px 32px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 32px;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 20px 32px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Data Layout inside Modal */
+.view-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.view-item { margin-bottom: 15px; }
+.view-item label { 
+    display: block; 
+    font-size: 11px; 
+    font-weight: 700; 
+    color: #94a3b8; 
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.view-item p { font-size: 15px; color: #1e293b; font-weight: 500; }
+
+.view-full-width { grid-column: span 2; }
+
+.view-tag {
+    display: inline-block;
+    background: #eff6ff;
+    color: #3b82f6;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin: 2px;
+    font-weight: 600;
+}
+
+/* File List in Modal */
+.view-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.view-file-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 15px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.view-file-link:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.file-icon {
+    font-size: 20px;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.file-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.file-size {
+    font-size: 11px;
+    color: #64748b;
 }

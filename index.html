@@ -1,62 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DICT Procurement - Dashboard</title>
-    <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="resource/base.css">
-    <link rel="stylesheet" href="resource/dashboard.css">
+  <meta charset="UTF-8">
+  <script>
+       (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            
+            // Add preload class to stop animations during load
+            document.documentElement.classList.add('preload');
+        })();
+    </script>
+  <title>Dashboard | DICT Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="resource/base.css">
+  <link rel="stylesheet" href="resource/dashboard.css">
 </head>
 <body>
-    <aside class="sidebar">
-        <div class="sidebar-logo">DICT PROCUREMENT</div>
-        <nav class="sidebar-nav">
-            <a href="index.html" class="nav-item active">Dashboard</a>
-            <a href="page1.html" class="nav-item" onclick="sessionStorage.removeItem('view_record_id')">New Request</a>
-            <a href="profile.html" class="nav-item">My Profile</a>
-        </nav>
-    </aside>
+  <aside class="sidebar">
+    <div class="sidebar-logo"><span>♦</span> MY ACCOUNT</div>
+    <nav class="sidebar-nav">
+      <a href="index.html" class="nav-item active">Dashboard</a>
+      <a href="page1.html" class="nav-item" onclick="sessionStorage.removeItem('view_record_id')">New Request</a>
+      <a href="profile.html" class="nav-item">Profile</a>
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar-small">TD</div>
+        <div><p style="font-size:12px; font-weight:700;">Test Doe</p><p style="font-size:10px; color:#64748b;">dummy.admin@dict...</p></div>
+    </div>
+  </aside>
 
-    <main class="main-content">
-        <header class="header-container">
-            <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
-        </header>
-
-        <div class="main-card-container">
-            <div class="title-tab-wrapper"><p class="text-9">PROCUREMENT DASHBOARD</p></div>
-
-            <div class="dashboard-header">
-                <div class="welcome-msg">
-                    <h2>Welcome back, Juan</h2>
-                    <p>Manage and track your procurement requests here.</p>
-                </div>
-                <a href="page1.html" class="create-btn" onclick="sessionStorage.removeItem('view_record_id')">+ Create New Request</a>
+  <main class="main-content">
+    <header class="top-nav">
+      <h1>Dashboard</h1>
+      <div style="display:flex; gap:15px; color:#64748b; align-items:center;">
+          <a href="page1.html" class="btn-primary" style="padding: 8px 16px; font-size: 12px; text-decoration: none;">+ New Request</a>
+          <button id="themeToggle" style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);">
+          <span id="themeIcon">☼</span>
+      </button> <span>🔔</span>
+      </div>
+      
+    </header>
+<div class="header-container">
+                <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
             </div>
+    <div class="page-container">
+      <!-- Greeting Banner -->
+      <div class="card banner-card">
+        <div>
+          <h2>Good day, Test!</h2>
+          <p style="color:#64748b; font-size:0.9rem;">Here's a quick look at your procurement requests and activity.</p>
+        </div>
+        <span style="font-size:2rem;">👋</span>
+      </div>
 
-            <div class="stats-grid">
-                <div class="stat-card"><span class="stat-label">Total Requests</span><span id="stat-total" class="stat-value">0</span></div>
-                <div class="stat-card"><span class="stat-label">Pending</span><span id="stat-pending" class="stat-value">0</span></div>
-                <div class="stat-card"><span class="stat-label">Completed</span><span id="stat-completed" class="stat-value">0</span></div>
+      <!-- Stats Grid -->
+      <div class="stats-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; margin-bottom:24px;">
+        <div class="card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+            <div><p style="font-size:11px; color:#64748b; font-weight:700;">TOTAL REQUESTS</p><h3 id="stat-total" style="font-size:1.5rem; margin-top:5px;">0</h3></div>
+            <span style="color:#3b82f6;">📄</span>
+        </div>
+        <div class="card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+            <div><p style="font-size:11px; color:#64748b; font-weight:700;">PENDING</p><h3 id="stat-pending" style="font-size:1.5rem; margin-top:5px;">0</h3></div>
+            <span style="color:#f59e0b;">🕒</span>
+        </div>
+        <div class="card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+            <div><p style="font-size:11px; color:#64748b; font-weight:700;">APPROVED</p><h3 id="stat-completed" style="font-size:1.5rem; margin-top:5px;">0</h3></div>
+            <span style="color:#10b981;">✅</span>
+        </div>
+        <div class="card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:0;">
+            <div><p style="font-size:11px; color:#64748b; font-weight:700;">PROFILE STATUS</p><h3 style="font-size:1.1rem; margin-top:5px;">Complete</h3></div>
+            <span style="color:#3b82f6;">👤</span>
+        </div>
+      </div>
+
+      <!-- NEW: PROCUREMENT REQUESTS LIST -->
+      <div class="card">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h4 style="font-size:0.9rem; font-weight:700;">My Procurement Requests</h4>
+        </div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 11px;">
+                        <th style="padding: 12px 10px;">PPMP NO.</th>
+                        <th>UNIT</th>
+                        <th>BUDGET</th>
+                        <th>STATUS</th>
+                        <th style="text-align: right;">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboard-table-body" style="font-size: 13px;">
+                    <!-- JavaScript will inject rows here with "View Details" buttons -->
+                </tbody>
+            </table>
+        </div>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="card">
+        <h4 style="font-size:0.9rem; font-weight:700; margin-bottom:20px;">↑ Quick Upload</h4>
+        <div style="border:1.5px dashed var(--border); border-radius:12px; padding:30px; text-align:center;">
+            <p style="font-size:0.85rem; font-weight:600;">Drag and drop or click to upload</p>
+            <p style="font-size:0.75rem; color:#64748b;">PDF, JPG, PNG (Max 10MB)</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- MODAL STRUCTURE (Hidden by default) -->
+    <div id="viewModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="modalTitle">Procurement Details</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
             </div>
-
-            <div class="table-container">
-                <h3>Recent Procurement Activities</h3>
-                <table class="dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>PPMP No.</th>
-                            <th>Implementing Unit</th>
-                            <th>Budget</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dashboard-table-body"></tbody>
-                </table>
+            <div class="modal-body" id="modalContent">
+                <!-- Data will be injected here by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Close</button>
             </div>
         </div>
-    </main>
+    </div>
+  </main>
+    <script src="scripts/theme.js"></script>
     <script src="scripts/dashboard-logic.js"></script>
 </body>
 </html>

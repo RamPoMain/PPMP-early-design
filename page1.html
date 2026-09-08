@@ -2,9 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Procurement Request</title>
-    <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            
+            // Add preload class to stop animations during load
+            document.documentElement.classList.add('preload');
+        })();
+    </script>
+    <title>New Request | DICT Procurement</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="resource/base.css">
     <link rel="stylesheet" href="resource/step1.css">
     <link rel="stylesheet" href="resource/step2.css">
@@ -12,64 +20,62 @@
 </head>
 <body>
     <aside class="sidebar">
-        <div class="sidebar-logo">DICT PROCUREMENT</div>
+        <div class="sidebar-logo"><span>♦</span> MY ACCOUNT</div>
         <nav class="sidebar-nav">
             <a href="index.html" class="nav-item">Dashboard</a>
-            <a href="page1.html" class="nav-item active">New Request</a>
-            <a href="profile.html" class="nav-item">My Profile</a>
+            <a href="page1.html" class="nav-item active">Procurement</a>
+            <a href="profile.html" class="nav-item">Profile</a>
         </nav>
     </aside>
 
     <main class="main-content">
-        <header class="header-container">
-            <img src="images/header-banner.png" class="header-banner" alt="DICT Header Banner">
+        <header class="top-nav">
+            <h1 style="font-size: 1rem; font-weight: 700;">New Procurement Request</h1>
+            <div style="display:flex; gap:20px; align-items:center; color: #64748b;"><span>☼</span> <span>🔔</span></div>
         </header>
 
-        <div class="main-card-container">
-            <div class="title-tab-wrapper"><p id="page-title" class="text-9">PROCUREMENT PROJECT DETAILS</p></div>
-
-            <div class="progress-section">
-                <div class="track-4" style="width: 60%; margin: 20px auto;">
-                    <div id="progress-fill" class="filled-5" style="width: 15%;"></div>
+        <div class="page-container">
+            <div class="card">
+                <h2 id="page-title" style="font-size: 1.1rem; font-weight: 800; margin-bottom: 24px; color: var(--primary);">PROCUREMENT PROJECT DETAILS</h2>
+                
+                <div class="progress-bar" style="height: 6px; background: #f1f5f9; border-radius: 10px; margin-bottom: 40px;">
+                    <div id="progress-fill" style="width: 15%; height: 100%; background: var(--primary); border-radius: 10px; transition: 0.4s ease;"></div>
                 </div>
-            </div>
 
-            <!-- STEP 1: Procurement Project Details -->
-            <div id="step-1">
-                <form class="form-grid" id="form-step-1">
-                    <div class="form-column">
-                        <div class="field-group" data-field="ppmp_no">
-                            <label>PPMP Number</label>
-                            <input type="text" id="ppmp_no" placeholder="ex. 1" required>
-                            <p class="field-error-msg">This field is required</p>
+                <!-- STEP 1 -->
+                <div id="form-step-1">
+                    <form style="display:grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+                        <div class="form-column">
+                            <div class="field-group" data-field="ppmp_no">
+                                <label>PPMP Number</label>
+                                <input type="text" id="ppmp_no" placeholder="Auto-generated">
+                                <p class="field-error-msg"></p>
+                            </div>
+                            <div class="field-group" data-field="is_indicative">
+                                <label>Is Indicative or Final?</label>
+                                <select id="is_indicative">
+                                    <option value="">Select...</option>
+                                    <option value="Indicative">Indicative</option>
+                                    <option value="Final">Final</option>
+                                </select>
+                                <p class="field-error-msg"></p>
+                            </div>
+                            <div class="field-group" data-field="end_user">
+                                <label>End-User or Implementing Unit</label>
+                                <input type="text" id="end_user" placeholder="Input Office">
+                                <p class="field-error-msg"></p>
+                            </div>
+                            <div class="field-group" data-field="fiscal_year">
+                                <label>Fiscal Year</label>
+                                <input type="text" id="fiscal_year" placeholder="2024">
+                                <p class="field-error-msg"></p>
+                            </div>
                         </div>
-                        <div class="field-group" data-field="is_indicative">
-                            <label>Is Indicative or Final?</label>
-                            <div class="select-wrapper"><select id="is_indicative" required><option value="" disabled selected>Select...</option><option>Indicative</option><option>Final</option></select><img src="images/vector-19.svg" class="custom-chevron"></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="end_user">
-                            <label>End-User or Implementing Unit</label>
-                            <input type="text" id="end_user" placeholder="Input" required>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="fiscal_year">
-                            <label>Fiscal Year</label>
-                            <input type="text" id="fiscal_year" placeholder="Field text goes here" required>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="project_type">
-                            <label>Type of Project to be Procured</label>
-                            <div class="select-wrapper"><select id="project_type" required><option value="" disabled selected>Select...</option><option>Consulting Services</option><option>Goods</option><option>Infrastructure</option></select><img src="images/vector-33.svg" class="custom-chevron"></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                    </div>
-                    <div class="form-column">
-                        <div class="field-group" data-field="modeOfProcurement">
-                            <label>Recommended Mode of Procurement</label>
-                            <div id="modeWrapper" class="select-wrapper">
-                                <select id="modeOfProcurement" required>
-                                    <option value="" disabled selected>Select mode...</option>
+                        <div class="form-column">
+                            <div class="field-group" data-field="modeOfProcurement">
+                                <label>Recommended Mode (RA 12009)</label>
+                                <select id="modeOfProcurement">
+                                    <option value="" disabled selected>Select Mode</option>
                                     <optgroup label="Competitive Mode">
                                         <option value="Competitive Bidding">Competitive Bidding</option>
                                     </optgroup>
@@ -78,124 +84,102 @@
                                         <option value="Direct Contracting">Direct Contracting</option>
                                         <option value="Repeat Order">Repeat Order</option>
                                         <option value="Shopping">Shopping</option>
-                                        <option value="Small Value Procurement (SVP)">Small Value Procurement (SVP)</option>
-                                        <option value="Direct Acquisition">Direct Acquisition</option>
-                                        <option value="Competitive Dialogue">Competitive Dialogue</option>
+                                        <option value="Direct Acquisition">Direct Acquisition (New RA 12009)</option>
+                                        <option value="Competitive Dialogue">Competitive Dialogue (New RA 12009)</option>
                                         <option value="Negotiated Procurement">Negotiated Procurement</option>
+                                        <option value="Unsolicited Offer">Unsolicited Offer w/ Comparative Bidding</option>
                                     </optgroup>
                                 </select>
-                                <img src="images/vector-43.svg" class="custom-chevron">
+                                <p class="field-error-msg"></p>
                             </div>
-                            <p class="mode-hint">Recommended by budget: ≤₱200,000 → Direct Acquisition · ₱200,001–₱2,000,000 → Small Value Procurement (SVP) · Above ₱2,000,000 → Competitive Bidding</p>
-                            <p id="modeErrorMsg" class="field-error-msg">Must Select Mode of Procurement</p>
-                        </div>
-                        <div class="field-group" data-field="pre_procurement">
-                            <label>Pre Procurement Conference?</label>
-                            <div class="select-wrapper"><select id="pre_procurement" required><option value="" disabled selected>Select...</option><option>No</option><option>Yes</option></select><img src="images/vector-51.svg" class="custom-chevron"></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="quantity_size">
-                            <label>Quantity and Size of the Project</label>
-                            <textarea id="quantity_size" placeholder="Message text goes here" style="height: 150px;" required></textarea>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                    </div>
-                </form>
-                <div class="footer-actions">
-                    <a href="index.html" class="back-btn" onclick="sessionStorage.removeItem('view_record_id')">&larr; Back</a>
-                    <button type="button" class="next-btn" onclick="validateAndProceed(1, showNextStep)">Next &rarr;</button>
-                </div>
-            </div>
-
-            <!-- STEP 2: Projected Timeline -->
-            <div id="step-2" class="hidden">
-                <form class="form-grid" id="form-step-2">
-                    <div class="form-column">
-                        <div class="field-group" data-field="start_date">
-                            <label>Start of Procurement Activity</label>
-                            <div class="input-with-icon"><span class="calendar-icon">📅</span><input id="start_date" type="date" required></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="end_date">
-                            <label>End of Procurement Activity</label>
-                            <div class="input-with-icon"><span class="calendar-icon">📅</span><input id="end_date" type="date" required></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="delivery_period">
-                            <label>Expected Delivery/ Implementation Period</label>
-                            <div class="input-with-icon"><span class="calendar-icon">📅</span><input id="delivery_period" type="date" required></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                    </div>
-                    <div class="form-column">
-                        <div class="field-group" data-field="fund_source">
-                            <label>Source of Funds</label>
-                            <input type="text" id="fund_source" placeholder="Field text goes here" required>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                        <div class="field-group" data-field="budget">
-                            <label>Estimated Budget / Budgetary Allocation</label>
-                            <div class="input-with-prefix"><span class="prefix">PHP</span><input id="budget" type="text" required></div>
-                            <p class="field-error-msg">This field is required</p>
-                        </div>
-                    </div>
-                </form>
-                <div class="footer-actions">
-                    <button class="back-btn" onclick="showStep1()">&larr; Back</button>
-                    <button type="button" class="next-btn" onclick="validateAndProceed(2, showStep3)">Next &rarr;</button>
-                </div>
-            </div>
-
-            <!-- STEP 3: Funding Details -->
-            <div id="step-3" class="hidden">
-                <div class="form-single-column" id="form-step-3">
-                    <div class="field-group" data-field="procurement_strategies">
-                        <label>Procurement Strategies and Tools</label>
-                        <p style="font-size: 12px; color: #666; margin-bottom: 5px;">Click to toggle one or more strategies:</p>
-                        <div id="procurement_strategies" class="custom-multi-select">
-                            <div class="select-box" id="strategiesTrigger"><div id="selectedTags" class="selected-tags-container"><span class="placeholder">Select strategies...</span></div><img src="images/vector-43.svg" class="custom-chevron"></div>
-                            <div class="options-list hidden" id="strategiesMenu">
-                                <div class="option">Life Cycle Assessment (LCA) and LCCA</div>
-                                <div class="option">Subcontracting</div>
-                                <div class="option">Multi-Year Contracting</div>
-                                <div class="option">Design-and-Build Scheme for Infrastructure</div>
-                                <div class="option">Engagement of a Procurement Agent</div>
-                                <div class="option">Use of Framework Agreement Section</div>
-                                <div class="option">Pooled Procurement Section 17</div>
-                                <div class="option">Renewal of Regular and Recurring Services</div>
-                                <div class="option">Warehousing and Inventory Activities</div>
+                            <div class="field-group" data-field="pre_procurement">
+                                <label>Pre Procurement Conference?</label>
+                                <select id="pre_procurement">
+                                    <option value="">Select...</option>
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                                <p class="field-error-msg"></p>
+                            </div>
+                            <div class="field-group" data-field="quantity_size">
+                                <label>Quantity and Size</label>
+                                <textarea id="quantity_size" style="height: 100px;"></textarea>
+                                <p class="field-error-msg"></p>
                             </div>
                         </div>
-                        <p class="field-error-msg">Select at least one strategy</p>
-                    </div>
-                    <div class="field-group" data-field="remarks">
-                        <label>Remarks</label>
-                        <textarea id="remarks" style="height: 120px;" required></textarea>
-                        <p class="field-error-msg">This field is required</p>
-                    </div>
-
-                    <!-- RE-ADDED: Attached Supporting Documents -->
-                    <div class="field-group" data-field="supporting_docs" style="margin-top: 10px;">
-                        <label>Attached Supporting Documents</label>
-                        <div class="upload-zone" id="uploadZone">
-                          <div class="upload-content" id="uploadContent">
-                            <span class="upload-icon">📤</span>
-                            <p class="upload-text">Drop here to attach or <span class="upload-link" id="uploadLink">upload</span></p>
-                            <p class="upload-subtext">Max 2MB per file, 8MB total</p>
-                          </div>
-                          <input type="file" id="fileInput" multiple hidden>
-                        </div>
-                        <ul id="uploadedFileList" class="uploaded-file-list"></ul>
-                        <p class="field-error-msg">Please attach at least one supporting document</p>
+                    </form>
+                    <div class="footer-actions" style="justify-content: flex-end;">
+                        <button class="btn-primary" onclick="validateAndProceed(1, showNextStep)">Continue &rarr;</button>
                     </div>
                 </div>
-                <div class="footer-actions">
-                    <button class="back-btn" onclick="showStep2()">&larr; Back</button>
-                    <button type="button" id="finishBtn" class="next-btn" onclick="validateAndProceed(3, saveProcurementRequest)">Finish &rarr;</button>
+
+                <!-- STEP 2 -->
+                <div id="form-step-2" class="hidden">
+                    <form style="display:grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+                        <div class="form-column">
+                            <div class="field-group" data-field="start_date"><label>Start Date</label><input type="date" id="start_date"><p class="field-error-msg"></p></div>
+                            <div class="field-group" data-field="end_date"><label>End Date</label><input type="date" id="end_date"><p class="field-error-msg"></p></div>
+                            <div class="field-group" data-field="delivery_period"><label>Expected Delivery</label><input type="date" id="delivery_period"><p class="field-error-msg"></p></div>
+                        </div>
+                        <div class="form-column">
+                            <div class="field-group" data-field="fund_source"><label>Source of Funds</label><input type="text" id="fund_source"><p class="field-error-msg"></p></div>
+                            <div class="field-group" data-field="budget">
+                                <label>Estimated Budget</label>
+                                <input type="text" id="budget" placeholder="0.00">
+                                <p class="field-error-msg"></p>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="footer-actions">
+                        <button class="btn-secondary" onclick="showStep1()">Back</button>
+                        <button class="btn-primary" onclick="validateAndProceed(2, showStep3)">Continue &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- STEP 3 -->
+                <div id="form-step-3" class="hidden">
+                    <div style="max-width: 800px; margin: 0 auto;">
+                        <div class="field-group" data-field="procurement_strategies">
+                            <label>Procurement Strategies and Tools (RA 12009)</label>
+                            <div id="procurement_strategies" class="custom-multi-select" style="position:relative;">
+                                <div id="strategiesTrigger" style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: #fff;">
+                                    <div id="selectedTags" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                                </div>
+                                <div id="strategiesMenu" class="hidden" style="position:absolute; width:100%; background:white; border:1px solid var(--border); z-index:100; max-height:250px; overflow-y:auto; border-radius:8px;">
+                                    <div class="option">Life Cycle Assessment (LCA) and LCCA</div>
+                                    <div class="option">Subcontracting</div>
+                                    <div class="option">Multi-Year Contracting</div>
+                                    <div class="option">Design-and-Build Scheme for Infrastructure Projects</div>
+                                    <div class="option">Engagement of a Procurement Agent</div>
+                                    <div class="option">Use of Framework Agreement Section</div>
+                                    <div class="option">Pooled Procurement Section 17</div>
+                                    <div class="option">Renewal of Regular and Recurring Services</div>
+                                    <div class="option">Warehousing and Inventory Activities</div>
+                                </div>
+                            </div>
+                            <p class="field-error-msg"></p>
+                        </div>
+                        <div class="field-group" data-field="remarks"><label>Remarks</label><textarea id="remarks"></textarea><p class="field-error-msg"></p></div>
+                        
+                        <div class="field-group" data-field="supporting_docs">
+                            <label>Supporting Documents</label>
+                            <div id="uploadZone" class="upload-zone" style="border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 12px; cursor: pointer;">
+                                <p>Click or drag files here to upload</p>
+                                <input type="file" id="fileInput" class="hidden" multiple>
+                                <ul id="uploadedFileList" style="list-style: none; margin-top: 15px; text-align: left;"></ul>
+                            </div>
+                            <p class="field-error-msg"></p>
+                        </div>
+                    </div>
+                    <div class="footer-actions">
+                        <button class="btn-secondary" onclick="showStep2()">Back</button>
+                        <button id="finishBtn" class="btn-primary" onclick="saveProcurementRequest()">Submit Request</button>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
+     <script src="scripts/theme.js"></script>
     <script src="scripts/script.js"></script>
 </body>
 </html>

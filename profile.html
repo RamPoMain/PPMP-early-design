@@ -1,47 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Profile - DICT</title>
-  <link href="https://fonts.googleapis.com/css?family=Roboto|Inter&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="resource/base.css">
-  <link rel="stylesheet" href="resource/profile.css">
+    <meta charset="UTF-8">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            
+            // Add preload class to stop animations during load
+            document.documentElement.classList.add('preload');
+        })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile | DICT Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="resource/base.css">
+    <link rel="stylesheet" href="resource/profile.css">
 </head>
 <body>
-
-  <aside class="sidebar">
-    <div class="sidebar-logo">DICT PROCUREMENT</div>
-    <nav class="sidebar-nav">
-      <a href="index.html" class="nav-item">Dashboard</a>
-      <a href="page1.html" class="nav-item">New Request</a>
-      <a href="profile.html" class="nav-item active">My Profile</a>
-    </nav>
-  </aside>
-
-  <main class="main-content">
-    <header class="header-container">
-      <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
-    </header>
-
-    <div class="main-card-container">
-      <div class="title-tab-wrapper"><p class="text-9">USER PROFILE</p></div>
-
-      <div class="profile-layout">
-        <div class="profile-sidebar">
-          <div class="avatar-circle"><span>JD</span></div>
-          <h2>Juan Dela Cruz</h2>
-          <p>Admin Officer V</p>
-          <button class="logout-btn">Logout</button>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo"><span>♦</span> MY ACCOUNT</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="page1.html" class="nav-item">Procurement</a>
+            <a href="profile.html" class="nav-item active">Profile</a>
+        </nav>
+        <div class="sidebar-user">
+            <div class="avatar-small">TD</div>
+            <div>
+                <p style="font-size:12px; font-weight:700;">Test Doe</p>
+                <p style="font-size:10px; color:var(--text-muted);">dummy.admin@dict...</p>
+            </div>
         </div>
-        <div class="profile-details">
-          <div class="info-grid">
-            <div class="info-item"><label>Email</label><p>juan.dc@dict.gov.ph</p></div>
-            <div class="info-item"><label>Division</label><p>ICTMD</p></div>
-          </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- TOP NAV -->
+        <header class="top-nav">
+            <h1>User Profile</h1>
+            <div style="display:flex; gap:15px; align-items: center;">
+                <button id="themeToggle" style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);">
+                    <span id="themeIcon">☼</span>
+                </button>
+                <span>🔔</span>
+            </div>
+        </header>
+
+        <div class="page-container">
+            <!-- Constrained Header Banner -->
+            <div class="header-container">
+                <img src="images/header-banner.png" class="header-banner" alt="DICT Banner">
+            </div>
+
+            <!-- Profile Card -->
+            <div class="card">
+                <div class="profile-layout">
+                    <!-- Left: Avatar Sidebar -->
+                    <div class="profile-sidebar">
+                        <div class="avatar-circle">
+                            <span>TD</span>
+                        </div>
+                        <h2 class="user-name">Test Doe</h2>
+                        <p class="user-role">Administrative Officer V</p>
+                        <button class="logout-btn">Logout</button>
+                    </div>
+
+                    <!-- Right: Info Details -->
+                    <div class="profile-details">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Employee ID</label>
+                                <p>2024-DICT-085</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Email Address</label>
+                                <p>dummy.admin@dict.gov.ph</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Division / Unit</label>
+                                <p>Information & Communications Tech Management (ICTMD)</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Office Location</label>
+                                <p>DICT Central Office, Quezon City</p>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 24px;">
+                            <button class="btn-primary" style="font-size: 0.85rem;">Edit Profile Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </main>
+    </main>
+
+    <script src="scripts/theme.js"></script>
 </body>
 </html>
