@@ -272,6 +272,15 @@
 
 
         <!-- =====================================================
+             HEADER BANNER
+             ===================================================== -->
+
+        <div class="db-header-banner">
+            <img src="images/header-banner.png" alt="DICT Header Banner">
+        </div>
+
+
+        <!-- =====================================================
              TOP BAR
              ===================================================== -->
 
@@ -379,21 +388,6 @@
             </div>
 
         </header>
-
-
-
-        <!-- =====================================================
-             HEADER BANNER
-             ===================================================== -->
-
-        <section class="profile-banner">
-
-            <img
-                src="images/header-banner.png"
-                alt="DICT Banner"
-            >
-
-        </section>
 
 
 
@@ -673,6 +667,63 @@
             aria-labelledby="page-title"
         >
 
+            <!-- Verify + Edit (view mode only) -->
+            <div class="db-modal-header-actions">
+
+                <button
+                    type="button"
+                    id="verifyRequestBtn"
+                    class="db-modal-verify-btn hidden"
+                    onclick="toggleVerifyStatus()"
+                    aria-label="Toggle verified status"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                    >
+                        <path
+                            d="M5 12.5l4.5 4.5L19 7"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                    <span id="verifyBtnLabel">Mark as Completed</span>
+                </button>
+
+                <button
+                    type="button"
+                    id="editRequestBtn"
+                    class="db-modal-edit-btn hidden"
+                    onclick="enableEditMode()"
+                    aria-label="Edit request"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                    >
+                        <path
+                            d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0 0-3l-1-1a2.1 2.1 0 0 0-3 0L4 15v5Z"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linejoin="round"
+                        />
+                        <path
+                            d="M13 6l5 5"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                        />
+                    </svg>
+                    Edit
+                </button>
+
+            </div>
+
             <!-- Close -->
             <button
                 type="button"
@@ -705,6 +756,13 @@
                 >
                     PROCUREMENT PROJECT DETAILS
                 </p>
+
+                <span
+                    id="modalStatusBadge"
+                    class="modal-status-badge hidden"
+                >
+                    PENDING
+                </span>
 
             </div>
 

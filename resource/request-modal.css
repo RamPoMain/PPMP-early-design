@@ -47,6 +47,68 @@
     margin-bottom: 40px;
 }
 
+/* Wraps the Verify and Edit buttons together so they sit to the left
+   of the close (X) button without needing separately hand-tuned
+   right offsets for each one. */
+.db-modal-header-actions {
+    position: absolute;
+    top: 18px;
+    right: 62px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.db-modal-edit-btn,
+.db-modal-verify-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 9px;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.db-modal-edit-btn {
+    border: 1px solid var(--db-accent, #3B82F6);
+    background: rgba(59, 130, 246, 0.10);
+    color: var(--db-accent, #3B82F6);
+}
+
+.db-modal-edit-btn:hover {
+    background: var(--db-accent, #3B82F6);
+    color: #fff;
+}
+
+/* Verify button: green "mark as completed" by default, switches to
+   amber "revert to pending" once the request is already completed. */
+.db-modal-verify-btn {
+    border: 1px solid var(--db-green, #22C55E);
+    background: rgba(34, 197, 94, 0.10);
+    color: var(--db-green, #22C55E);
+}
+
+.db-modal-verify-btn:hover {
+    background: var(--db-green, #22C55E);
+    color: #fff;
+}
+
+.db-modal-verify-btn.is-completed {
+    border-color: var(--db-amber, #F59E0B);
+    background: rgba(245, 158, 11, 0.10);
+    color: var(--db-amber, #F59E0B);
+}
+
+.db-modal-verify-btn.is-completed:hover {
+    background: var(--db-amber, #F59E0B);
+    color: #fff;
+}
+
 .db-modal-close {
     position: absolute;
     top: 18px;
@@ -312,51 +374,95 @@
 
 @media (max-width: 640px) {
     .db-modal { padding: 26px 20px 20px; }
+    .db-modal-header-actions { right: 54px; gap: 6px; }
+    .db-modal-edit-btn,
+    .db-modal-verify-btn { padding: 7px 8px; font-size: 0; gap: 0; }
+    .db-modal-edit-btn svg,
+    .db-modal-verify-btn svg { width: 15px; height: 15px; }
     .db-modal .footer-actions { flex-direction: column-reverse; gap: 10px; }
     .db-modal .back-btn,
     .db-modal .next-btn { width: 100%; text-align: center; }
 }
 
-/* Remove the white background from the title wrapper in dark mode */
+/* Title wrapper: dark, centered, with room for an optional status
+   badge underneath (shown only in view mode — see modal-status-badge). */
 .db-modal .title-tab-wrapper {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     display: flex;
-    justify-content: center;
-}
-
-/* Ensure the text inside is clearly visible */
-.db-modal .text-9 {
-    background: transparent !important;
-    color: var(--db-text, #E7EAF3) !important;
-    text-align: center;
-    width: 100%;
-}
-
-.db-modal .title-tab-wrapper {
-    background: transparent !important;
-    border: none !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 24px;
-    display: flex;
-    justify-content: center;
     width: 100%;
 }
 
 .db-modal .text-9 {
-    padding-right: 0 !important; /* Removes the offset that was in your original CSS */
+    background: transparent !important;
+    padding-right: 0 !important;
+    color: var(--db-text, #E7EAF3) !important;
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
     font-size: 14px;
-    color: var(--db-text, #E7EAF3);
     text-align: center;
+    width: 100%;
+}
+
+/* ---------------- Status badge (view mode) ---------------- */
+
+.modal-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 13px;
+    border-radius: 999px;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+}
+
+.modal-status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.modal-status-badge.is-pending {
+    background: rgba(245, 158, 11, 0.14);
+    color: var(--db-amber, #F59E0B);
+}
+
+.modal-status-badge.is-completed {
+    background: rgba(34, 197, 94, 0.14);
+    color: var(--db-green, #22C55E);
+}
+
+
+.db-modal-header-actions {
+    position: absolute;
+    top: 18px;
+    right: 62px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    /* ADD THIS */
+    z-index: 10;
+}
+
+.db-modal-close {
+    z-index: 10;
 }
 
 .db-modal .title-tab-wrapper {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    display: flex;
-    justify-content: center;
+    pointer-events: none;
+}
+
+.db-modal .title-tab-wrapper .modal-status-badge {
+    pointer-events: none;
 }

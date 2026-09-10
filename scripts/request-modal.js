@@ -425,11 +425,24 @@ function saveProcurementRequest() {
         return;
     }
 
+    const db =
+        JSON.parse(
+            localStorage.getItem(
+                'procurement_records'
+            )
+        ) || [];
+
+    // currentEditingId is set by openRequestModal()/loadRecordIntoModal()
+    // whenever we opened this modal against a saved record. If the user
+    // clicked Edit and is now saving, this is an update, not a new entry.
+    const existingRecord = currentEditingId
+        ? db.find(r => r.id == currentEditingId)
+        : null;
 
     const entry = {
 
         id:
-            Date.now(),
+            existingRecord ? existingRecord.id : Date.now(),
 
         ppmp_no:
             document.getElementById(
@@ -518,22 +531,23 @@ function saveProcurementRequest() {
             })),
 
         status:
-            'Pending',
+            existingRecord ? existingRecord.status : 'Pending',
 
         date:
-            new Date().toLocaleDateString()
+            existingRecord ? existingRecord.date : new Date().toLocaleDateString()
     };
 
 
-    const db =
-        JSON.parse(
-            localStorage.getItem(
-                'procurement_records'
-            )
-        ) || [];
-
-
-    db.push(entry);
+    if (existingRecord) {
+        const idx = db.findIndex(r => r.id == currentEditingId);
+        if (idx !== -1) {
+            db[idx] = entry;
+        } else {
+            db.push(entry);
+        }
+    } else {
+        db.push(entry);
+    }
 
 
     try {
@@ -568,7 +582,9 @@ function saveProcurementRequest() {
         }
 
         showToast(
-            `Request "PPMP No. ${entry.ppmp_no}" was saved successfully.`
+            existingRecord
+                ? `Request "PPMP No. ${entry.ppmp_no}" was updated successfully.`
+                : `Request "PPMP No. ${entry.ppmp_no}" was saved successfully.`
         );
 
     } catch (err) {
@@ -2169,6 +2185,17 @@ function resetRequestForm() {
 
     document.getElementById('progress-fill').style.width = '15%';
 
+    // Edit/Verify controls and the status badge are only ever shown once
+    // a saved record is loaded in view mode, in loadRecordIntoModal()
+    const editBtn = document.getElementById('editRequestBtn');
+    if (editBtn) editBtn.classList.add('hidden');
+
+    const verifyBtn = document.getElementById('verifyRequestBtn');
+    if (verifyBtn) verifyBtn.classList.add('hidden');
+
+    const statusBadge = document.getElementById('modalStatusBadge');
+    if (statusBadge) statusBadge.classList.add('hidden');
+
 
     // Fresh PPMP number for this new request
     initializePpmpNumber();
@@ -2240,7 +2267,10 @@ function loadRecordIntoModal(id) {
             id: Math.random(),
             file: { name: doc.name, size: doc.size },
             dataUrl: doc.dataUrl,
-            objectUrl: doc.dataUrl // In a real app, you'd convert Base64 back to Blob
+            // Browsers block target="_blank" navigation straight to a
+            // data: URL (silently opens a blank tab), so rebuild a real
+            // blob URL the link can actually open.
+            objectUrl: base64DataUrlToObjectUrl(doc.dataUrl) || doc.dataUrl
         }));
         renderUploadedFiles();
     }
@@ -2251,6 +2281,112 @@ function loadRecordIntoModal(id) {
     
     // Disable all inputs so it's "Read Only"
     disableModalFields();
+
+    // Status badge + verify/undo control
+    updateStatusBadge(data.status);
+    updateVerifyButtonLabel(data.status);
+
+    const statusBadge = document.getElementById('modalStatusBadge');
+    if (statusBadge) statusBadge.classList.remove('hidden');
+
+    const verifyBtn = document.getElementById('verifyRequestBtn');
+    if (verifyBtn) verifyBtn.classList.remove('hidden');
+
+    // Offer a way out of read-only mode
+    const editBtn = document.getElementById('editRequestBtn');
+    if (editBtn) editBtn.classList.remove('hidden');
+}
+
+// Reflects a record's status as a colored pill next to the modal title.
+function updateStatusBadge(status) {
+    const badge = document.getElementById('modalStatusBadge');
+    if (!badge) return;
+
+    const isCompleted = status === 'Completed';
+    badge.textContent = isCompleted ? 'Completed' : 'Pending';
+    badge.classList.toggle('is-completed', isCompleted);
+    badge.classList.toggle('is-pending', !isCompleted);
+}
+
+// Keeps the verify button's label/color in sync with the current status:
+// "Mark as Completed" when pending, "Mark as Pending" once completed.
+function updateVerifyButtonLabel(status) {
+    const verifyBtn = document.getElementById('verifyRequestBtn');
+    const label = document.getElementById('verifyBtnLabel');
+    if (!verifyBtn || !label) return;
+
+    const isCompleted = status === 'Completed';
+    label.textContent = isCompleted ? 'Mark as Pending' : 'Mark as Completed';
+    verifyBtn.classList.toggle('is-completed', isCompleted);
+}
+
+// Flips a viewed record between Pending and Completed directly from the
+// modal, without needing to go through Edit — this is the "verify" action.
+function toggleVerifyStatus() {
+    if (!currentEditingId) return;
+
+    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const idx = db.findIndex(r => r.id == currentEditingId);
+    if (idx === -1) return;
+
+    const nextStatus = db[idx].status === 'Completed' ? 'Pending' : 'Completed';
+    db[idx].status = nextStatus;
+
+    try {
+        localStorage.setItem('procurement_records', JSON.stringify(db));
+    } catch (err) {
+        showToast('Could not update the status — please try again.');
+        return;
+    }
+
+    // Reflect the change immediately in the still-open modal
+    updateStatusBadge(nextStatus);
+    updateVerifyButtonLabel(nextStatus);
+
+    // Refresh the dashboard behind the modal (stat cards, activity feed,
+    // notification dot) so it doesn't go stale until the modal is closed
+    if (typeof getRecords === 'function') {
+        const records = getRecords();
+
+        if (typeof renderStats === 'function') renderStats(records);
+        if (typeof renderActivity === 'function') renderActivity(records);
+
+        const notifDot = document.getElementById('notifDot');
+        if (notifDot) {
+            const pendingCount = records.filter(r => r.status === 'Pending').length;
+            notifDot.classList.toggle('hidden', pendingCount === 0);
+        }
+    }
+
+    showToast(
+        nextStatus === 'Completed'
+            ? 'Request verified and marked as completed.'
+            : 'Request reverted to pending.'
+    );
+}
+
+function enableEditMode() {
+    isViewMode = false;
+    enableModalFields();
+
+    const editBtn = document.getElementById('editRequestBtn');
+    if (editBtn) editBtn.classList.add('hidden');
+
+    const verifyBtn = document.getElementById('verifyRequestBtn');
+    if (verifyBtn) verifyBtn.classList.add('hidden');
+
+    // Reflect the mode switch in the title if it's still showing the
+    // "viewing" label (it gets overwritten anyway on step navigation)
+    const title = document.getElementById('page-title');
+    if (title && title.innerText.indexOf('VIEWING REQUEST') === 0) {
+        title.innerText = title.innerText.replace('VIEWING REQUEST', 'EDITING REQUEST');
+    }
+
+    // finishBtn only exists on step 3 — guard in case we're on step 1/2
+    const finishBtn = document.getElementById('finishBtn');
+    if (finishBtn) finishBtn.innerText = 'Save Changes →';
+
+    showToast('You can now edit this request.');
 }
 
 function disableModalFields() {
@@ -2279,6 +2415,7 @@ function closeRequestModal() {
 
     overlay.classList.add('hidden');
     document.body.style.overflow = '';
+    currentEditingId = null;
 }
 
 

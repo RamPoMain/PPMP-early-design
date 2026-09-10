@@ -31,39 +31,6 @@
 
 
 /* ============================================================
-   HEADER BANNER
-   ============================================================ */
-
-.profile-banner {
-    width: 100%;
-    margin-bottom: 20px;
-
-    background: var(--db-card, #111A2E);
-
-    border: 1px solid var(--db-border, rgba(255,255,255,0.08));
-    border-radius: 14px;
-
-    overflow: hidden;
-
-    min-height: 150px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.profile-banner img {
-    width: 100%;
-    height: 150px;
-
-    display: block;
-
-    object-fit: cover;
-    object-position: center;
-}
-
-
-/* ============================================================
    PROFILE HERO
    ============================================================ */
 
@@ -570,7 +537,6 @@
    LIGHT THEME
    ============================================================ */
 
-html[data-theme="light"] .profile-banner,
 html[data-theme="light"] .profile-hero-card,
 html[data-theme="light"] .profile-card {
 
@@ -639,15 +605,6 @@ html[data-theme="light"] .profile-secondary-btn:hover {
 
 
 @media (max-width: 700px) {
-
-    .profile-banner {
-        min-height: 110px;
-    }
-
-    .profile-banner img {
-        height: 110px;
-    }
-
 
     .profile-hero-card {
         align-items: flex-start;

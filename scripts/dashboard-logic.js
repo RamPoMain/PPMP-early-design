@@ -55,7 +55,12 @@ function formatRelativeTime(timestamp) {
 
 function renderStats(records) {
 
-    document.getElementById('stat-total').innerText = records.length;
+    // These stat cards only exist on the dashboard page — bail out quietly
+    // on pages (like Profile) that don't have them, instead of throwing.
+    const totalEl = document.getElementById('stat-total');
+    if (!totalEl) return;
+
+    totalEl.innerText = records.length;
 
     document.getElementById('stat-pending').innerText =
         records.filter(r => r.status === 'Pending').length;
@@ -213,11 +218,14 @@ function initThemeToggle() {
 
 document.addEventListener('DOMContentLoaded', function () {
 
+    // Theme must initialize regardless of what page we're on — run it
+    // before anything dashboard-specific that might not apply here.
+    initThemeToggle();
+
     const records = getRecords();
 
     renderStats(records);
     renderActivity(records);
-    initThemeToggle();
 
     const notifDot = document.getElementById('notifDot');
 
