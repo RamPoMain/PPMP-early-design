@@ -959,9 +959,9 @@ function validateIndividualField(fieldGroup) {
 // ============================================================
 
 const MODE_BUDGET_BRACKETS = [
-    { max: 200000, mode: 'Direct Acquisition', label: '₱0 – ₱200,000' },
-    { max: 2000000, mode: 'Small Value Procurement (SVP)', label: '₱200,001 – ₱2,000,000' },
-    { max: Infinity, mode: 'Competitive Bidding', label: 'Above ₱2,000,000' }
+    { max: 199999, mode: 'Direct Acquisition', label: '₱0 – ₱199,999' },
+    { max: 1999999, mode: 'Small Value Procurement (SVP)', label: '₱200,000 – ₱1,999,999' },
+    { max: Infinity, mode: 'Competitive Bidding', label: '₱2,000,000 and above' }
 ];
 
 
