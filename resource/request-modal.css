@@ -47,9 +47,6 @@
     margin-bottom: 40px;
 }
 
-/* Wraps the Verify and Edit buttons together so they sit to the left
-   of the close (X) button without needing separately hand-tuned
-   right offsets for each one. */
 .db-modal-header-actions {
     position: absolute;
     top: 18px;

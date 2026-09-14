@@ -256,6 +256,23 @@ function initializePpmpNumber() {
     ppmpField.readOnly = true;
 }
 
+function initializeFiscalYear() {
+    const fiscalYearField = document.getElementById('fiscal_year');
+    if (!fiscalYearField) return;
+
+    if (isViewMode || currentEditingId) return;
+
+    const currentYear = new Date().getFullYear();
+    fiscalYearField.value = currentYear + 1; 
+
+    // THE FIX: Prevent user interaction
+    fiscalYearField.readOnly = true;
+    
+    // Optional: Add a style so it looks non-interactive (grayish)
+    fiscalYearField.style.backgroundColor = "var(--bg-main)";
+    fiscalYearField.style.cursor = "default";
+}
+
 
 // ============================================================
 // NUMBER-ONLY INPUT RESTRICTIONS
@@ -2169,7 +2186,7 @@ function resetRequestForm() {
         )
         .forEach(field => {
 
-            if (field.id === 'ppmp_no') return; // regenerated below
+            if (field.id === 'ppmp_no' || field.id === 'fiscal_year') return; // regenerated below
 
             field.value = '';
         });
@@ -2255,6 +2272,7 @@ function openRequestModal(id = null) {
         isViewMode = false;
         enableModalFields();
         initializePpmpNumber();
+        initializeFiscalYear();
         document.getElementById('finishBtn').innerText = 'Finish →';
     }
 }
@@ -2433,10 +2451,12 @@ function disableModalFields() {
 function enableModalFields() {
     document.querySelectorAll('#requestModalOverlay input, #requestModalOverlay select, #requestModalOverlay textarea')
         .forEach(el => el.disabled = false);
+    
     document.getElementById('uploadZone').style.pointerEvents = 'auto';
     document.getElementById('strategiesTrigger').style.pointerEvents = 'auto';
-    // Keep PPMP Readonly as per your original logic
+
     document.getElementById('ppmp_no').readOnly = true;
+    document.getElementById('fiscal_year').readOnly = true; // <--- ADD THIS LINE
 }
 
 
@@ -2512,6 +2532,7 @@ document.addEventListener(
         // on page1.html).
 
         initializePpmpNumber();
+        initializeFiscalYear();
         initializeStrategies();
         initializeModeValidation();
         initRequiredFieldValidation();
