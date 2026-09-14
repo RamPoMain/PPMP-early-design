@@ -201,6 +201,14 @@
     color: var(--db-text-faint, #5B6478);
 }
 
+/* Required-document hint — brighter blue badge so it stands out
+   against the dark modal background. */
+.db-modal .doc-type-hint {
+    background: rgba(59, 130, 246, 0.16);
+    color: #93C5FD;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
 /* ---------------- Progress bar ---------------- */
 
 .db-modal .track-4 {

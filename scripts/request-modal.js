@@ -34,6 +34,34 @@ const MAX_TOTAL_SIZE = 8 * 1024 * 1024;  // 8MB total
 
 
 // ============================================================
+// REQUIRED DOCUMENT BY TYPE OF PROJECT
+// (Technical Specifications for Goods, Terms of Reference for
+// Regular/Consulting Services, Scope of Work for Infrastructure)
+// ============================================================
+
+const PROJECT_TYPE_DOC_LABELS = {
+    'Goods': 'Technical Specifications',
+    'Consulting Services': 'Terms of Reference',
+    'Infrastructure': 'Scope of Work'
+};
+
+function updateDocTypeHint() {
+
+    const hintEl = document.getElementById('docTypeHint');
+    if (!hintEl) return;
+
+    const projectTypeEl = document.getElementById('project_type');
+    const projectType = projectTypeEl ? projectTypeEl.value : '';
+
+    const docLabel = PROJECT_TYPE_DOC_LABELS[projectType];
+
+    hintEl.innerText = docLabel
+        ? `Required document: ${docLabel}`
+        : 'Select a Type of Project in Step 1 to see the required document.';
+}
+
+
+// ============================================================
 // NAVIGATION LOGIC
 // ============================================================
 
@@ -60,6 +88,8 @@ function showStep3() {
 
     document.getElementById('progress-fill').style.width =
         "85%";
+
+    updateDocTypeHint();
 }
 
 
@@ -2174,6 +2204,8 @@ function resetRequestForm() {
     // Clear any leftover validation state
     clearAllFieldErrors();
 
+    updateDocTypeHint();
+
 
     // Back to Step 1
     document.getElementById('step-2').classList.add('hidden');
@@ -2256,6 +2288,8 @@ function loadRecordIntoModal(id) {
         const el = document.getElementById(key);
         if (el) el.value = fieldMap[key] || '';
     });
+
+    updateDocTypeHint();
 
     // Load Strategies
     selectedStrategies = data.strategies || [];
@@ -2490,5 +2524,11 @@ document.addEventListener(
         renderTags(
             document.getElementById('selectedTags')
         );
+
+        const projectTypeEl = document.getElementById('project_type');
+        if (projectTypeEl) {
+            projectTypeEl.addEventListener('change', updateDocTypeHint);
+        }
+        updateDocTypeHint();
     }
 );

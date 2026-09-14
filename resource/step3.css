@@ -103,6 +103,22 @@
   opacity: 0.5;
 }
 
+/* Required-document hint above the upload zone — deliberately louder
+   than the small gray .mode-hint text so it doesn't get missed. */
+.doc-type-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #eff6ff;
+  color: #0369a1;
+  border: 1px solid #bfdbfe;
+}
+
 .upload-text {
   font-family: var(--font-family-inter);
   color: #6d7280;
