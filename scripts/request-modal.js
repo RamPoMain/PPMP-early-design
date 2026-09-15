@@ -209,27 +209,22 @@ function clearAllFieldErrors() {
 // ============================================================
 
 function getNextPpmpNumber() {
+    const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
 
-    const records =
-        JSON.parse(
-            localStorage.getItem('procurement_records')
-        ) || [];
+    // THE FILTER: Only look at records that are already "Completed" (Verified)
+    const approvedRecords = records.filter(record => record.status === 'Completed');
 
     let highestNumber = 0;
 
-    records.forEach(record => {
-
-        const number =
-            parseInt(record.ppmp_no, 10);
-
-        if (
-            !isNaN(number) &&
-            number > highestNumber
-        ) {
+    approvedRecords.forEach(record => {
+        const number = parseInt(record.ppmp_no, 10);
+        if (!isNaN(number) && number > highestNumber) {
             highestNumber = number;
         }
     });
 
+    // Returns the next number after the highest approved one
+    // If no approved records exist, it starts at 1
     return highestNumber + 1;
 }
 
@@ -263,7 +258,7 @@ function initializeFiscalYear() {
     if (isViewMode || currentEditingId) return;
 
     const currentYear = new Date().getFullYear();
-    fiscalYearField.value = currentYear + 1; 
+    fiscalYearField.value = currentYear; 
 
     // THE FIX: Prevent user interaction
     fiscalYearField.readOnly = true;
