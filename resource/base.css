@@ -17,6 +17,7 @@ body {
   min-height: 100vh;
 }
 
+
 /* SIDEBAR SYSTEM */
 .sidebar {
   width: 260px;
@@ -126,15 +127,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #0088ff
 .back-btn { color: var(--text-gray); margin-right: auto; }
 .back-btn:hover { color: var(--text-dark); }
 .next-btn:hover { color: #0088ff; transform: translateX(5px); }
-:root {
-  --font-family-roboto: 'Roboto', sans-serif;
-  --font-family-inter: 'Inter', sans-serif;
-  --dict-dark-blue: #003366;
-  --dict-beige: #white;
-  --text-gray: #6d7280;
-  --text-dark: #49454f;
-  --error-red: #dc2626;
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

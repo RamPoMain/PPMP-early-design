@@ -128,10 +128,6 @@
     border-color: var(--db-accent, #3B82F6);
 }
 
-.db-modal .text-9 {
-    color: var(--db-text, #E7EAF3);
-    padding-right: 30px;
-}
 
 .db-modal label {
     color: var(--db-text-dim, #8B94A8);
@@ -401,24 +397,31 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 24px;
-    width: 100%;
+    width: auto !important;
+    min-width: 200px !important;
+    padding: 12px 24px !important;
 }
 
 .db-modal .text-9 {
     background: transparent !important;
-    padding-right: 0 !important;
-    color: var(--db-text, #E7EAF3) !important;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    color: var(--db-text, #E7EAF3);
+    padding-right: 30px;
+
+    font-weight: 800 !important; /* Extra bold */
+    font-size: 13px !important;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    font-size: 14px;
     text-align: center;
-    width: 100%;
+    width: auto;
 }
 
 /* ---------------- Status badge (view mode) ---------------- */
 
 .modal-status-badge {
+    margin-top: 2px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -466,6 +469,23 @@
 }
 
 .db-modal .title-tab-wrapper {
+    position: absolute;
+    top: -24px; 
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--db-card, #111A2E) !important;
+    border: 1px solid var(--db-field-border, rgba(255,255,255,0.1)) !important;
+    
+    padding: 14px 44px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 5;
+    min-width: 340px;
     pointer-events: none;
 }
 
