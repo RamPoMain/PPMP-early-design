@@ -543,7 +543,7 @@ html[data-theme="light"] .profile-card {
     background: var(--db-card, #FFFFFF);
 
     border-color:
-        rgba(15, 23, 42, 0.08);
+        rgba(15, 23, 42, 0.18);
 }
 
 
@@ -552,7 +552,7 @@ html[data-theme="light"] .profile-card-footer,
 html[data-theme="light"] .profile-info-row {
 
     border-color:
-        rgba(15, 23, 42, 0.07);
+        rgba(15, 23, 42, 0.18);
 }
 
 
@@ -724,7 +724,7 @@ html[data-theme="light"] .profile-secondary-btn:hover {
 [data-theme="dark"] #requestModalOverlay .select-box {
     background-color: #0D1424 !important; /* Darker navy for input wells */
     color: #F8FAFC !important;           /* Bright white text for the values */
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
 /* 4. Fix Placeholder Text visibility */
@@ -749,6 +749,7 @@ html[data-theme="light"] .profile-secondary-btn:hover {
 /* 7. Progress Bar background track */
 [data-theme="dark"] #requestModalOverlay .track-4 {
     background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
 }
 
 /* 8. Fix hint text (below Mode of Procurement) */

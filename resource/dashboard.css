@@ -23,6 +23,8 @@
     --db-violet-soft: rgba(139, 92, 246, 0.14);
     --db-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     --db-radius: 14px;
+    --db-field-border: rgba(255, 255, 255, 0.20);
+
 }
 
 html[data-theme="light"] {
@@ -30,10 +32,12 @@ html[data-theme="light"] {
     --db-bg-sidebar: #FFFFFF;
     --db-card: #FFFFFF;
     --db-card-alt: #F8FAFC;
-    --db-border: #E6E9F2;
+    --db-border: #D4D9E3;
     --db-text: #121826;
     --db-text-dim: #5B6478;
     --db-text-faint: #9AA3B5;
+    --db-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+    --db-field-border: #C7CCDA;
     --db-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
 }
 
