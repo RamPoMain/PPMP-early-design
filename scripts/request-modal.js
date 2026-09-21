@@ -580,6 +580,9 @@ function saveProcurementRequest() {
         status:
             existingRecord ? existingRecord.status : 'Pending',
 
+        approved_at:
+            existingRecord ? existingRecord.approved_at : undefined,
+
         date:
             existingRecord ? existingRecord.date : new Date().toLocaleDateString()
     };
@@ -610,22 +613,8 @@ function saveProcurementRequest() {
         // loaded on the same page).
         closeRequestModal();
 
-        if (typeof getRecords === 'function') {
-
-            const records = getRecords();
-
-            if (typeof renderStats === 'function') renderStats(records);
-            if (typeof renderActivity === 'function') renderActivity(records);
-
-            const notifDot = document.getElementById('notifDot');
-
-            if (notifDot) {
-
-                const pendingCount =
-                    records.filter(r => r.status === 'Pending').length;
-
-                notifDot.classList.toggle('hidden', pendingCount === 0);
-            }
+        if (typeof refreshDashboardRecords === 'function') {
+            refreshDashboardRecords();
         }
 
         showToast(
@@ -2388,6 +2377,11 @@ function toggleVerifyStatus() {
 
     const nextStatus = db[idx].status === 'Completed' ? 'Pending' : 'Completed';
     db[idx].status = nextStatus;
+    if (nextStatus === 'Completed') {
+        db[idx].approved_at = Date.now();
+    } else {
+        delete db[idx].approved_at;
+    }
 
     try {
         localStorage.setItem('procurement_records', JSON.stringify(db));
@@ -2402,17 +2396,8 @@ function toggleVerifyStatus() {
 
     // Refresh the dashboard behind the modal (stat cards, activity feed,
     // notification dot) so it doesn't go stale until the modal is closed
-    if (typeof getRecords === 'function') {
-        const records = getRecords();
-
-        if (typeof renderStats === 'function') renderStats(records);
-        if (typeof renderActivity === 'function') renderActivity(records);
-
-        const notifDot = document.getElementById('notifDot');
-        if (notifDot) {
-            const pendingCount = records.filter(r => r.status === 'Pending').length;
-            notifDot.classList.toggle('hidden', pendingCount === 0);
-        }
+    if (typeof refreshDashboardRecords === 'function') {
+        refreshDashboardRecords();
     }
 
     showToast(
@@ -2475,30 +2460,6 @@ function closeRequestModal() {
     overlay.classList.add('hidden');
     document.body.style.overflow = '';
     currentEditingId = null;
-}
-
-
-function showToast(message) {
-
-    let toast =
-        document.getElementById('dbToast');
-
-    if (!toast) {
-
-        toast = document.createElement('div');
-        toast.id = 'dbToast';
-        toast.className = 'db-toast';
-        document.body.appendChild(toast);
-    }
-
-    toast.textContent = message;
-    toast.classList.add('show');
-
-    clearTimeout(toast._hideTimer);
-
-    toast._hideTimer = setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3200);
 }
 
 
