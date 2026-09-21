@@ -218,8 +218,6 @@ function initThemeToggle() {
 
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Theme must initialize regardless of what page we're on — run it
-    // before anything dashboard-specific that might not apply here.
     initThemeToggle();
 
     const records = getRecords();

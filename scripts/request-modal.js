@@ -490,6 +490,11 @@ function saveProcurementRequest() {
             document.getElementById(
                 'ppmp_no'
             ).value || 'N/A',
+        
+        project_description: 
+            document.getElementById(
+                'project_description'
+            ).value,
 
         is_indicative:
             document.getElementById(
@@ -2240,6 +2245,8 @@ function resetRequestForm() {
     const statusBadge = document.getElementById('modalStatusBadge');
     if (statusBadge) statusBadge.classList.add('hidden');
 
+    const pdfButtons = document.querySelectorAll('.pdf-btn-global');
+    pdfButtons.forEach(btn => btn.style.display = 'none');
 
     // Fresh PPMP number for this new request
     initializePpmpNumber();
@@ -2273,6 +2280,8 @@ function openRequestModal(id = null) {
 }
 
 function loadRecordIntoModal(id) {
+    const pdfButtons = document.querySelectorAll('.pdf-btn-global');
+    pdfButtons.forEach(btn => btn.style.display = 'inline-flex');
     const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
     const data = records.find(r => r.id == id);
     if (!data) return;
@@ -2282,6 +2291,7 @@ function loadRecordIntoModal(id) {
     // Fill Basic Fields
     const fieldMap = {
         'ppmp_no': data.ppmp_no,
+        'project_description': data.project_description,
         'is_indicative': data.is_indicative,
         'end_user': data.end_user,
         'fiscal_year': data.fiscal_year,

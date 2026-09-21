@@ -178,6 +178,11 @@
                             <input type="text" id="ppmp_no" placeholder="ex. 1" required>
                             <p class="field-error-msg">This field is required</p>
                         </div>
+                        <div class="field-group" data-field="project_description">
+                            <label>General Description and Objective</label>
+                            <textarea id="project_description" placeholder="Enter the objective of the project..." style="height: 80px;" required></textarea>
+                            <p class="field-error-msg">This field is required</p>
+                        </div>
                         <div class="field-group" data-field="is_indicative">
                             <label>Is Indicative or Final?</label>
                             <div class="select-wrapper"><select id="is_indicative" required><option value="" disabled selected>Select...</option><option>Indicative</option><option>Final</option></select><img src="images/vector-19.svg" class="custom-chevron"></div>
@@ -238,6 +243,10 @@
                 </form>
                 <div class="footer-actions">
                     <button type="button" class="back-btn" onclick="closeRequestModal()">&larr; Cancel</button>
+                    <button type="button" class="db-modal-pdf-btn pdf-btn-global" onclick="generatePPMP_PDF()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" style="margin-right: 8px;"><path d="M7 18H17M7 14H17M7 10H11M14 2H7C5.89543 2 5 2.90457 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Export PDF
+                    </button>
                     <button type="button" class="next-btn" onclick="validateAndProceed(1, showNextStep)">Next &rarr;</button>
                 </div>
             </div>
@@ -277,6 +286,10 @@
                 </form>
                 <div class="footer-actions">
                     <button class="back-btn" onclick="showStep1()">&larr; Back</button>
+                    <button type="button" class="db-modal-pdf-btn pdf-btn-global" onclick="generatePPMP_PDF()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" style="margin-right: 8px;"><path d="M7 18H17M7 14H17M7 10H11M14 2H7C5.89543 2 5 2.90457 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Export PDF
+                    </button>
                     <button type="button" class="next-btn" onclick="validateAndProceed(2, showStep3)">Next &rarr;</button>
                 </div>
             </div>
@@ -326,6 +339,10 @@
                 </div>
                 <div class="footer-actions">
                     <button class="back-btn" onclick="showStep2()">&larr; Back</button>
+                    <button type="button" class="db-modal-pdf-btn pdf-btn-global" onclick="generatePPMP_PDF()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" style="margin-right: 8px;"><path d="M7 18H17M7 14H17M7 10H11M14 2H7C5.89543 2 5 2.90457 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Export PDF
+                    </button>
                     <button type="button" id="finishBtn" class="next-btn" onclick="validateAndProceed(3, saveProcurementRequest)">Finish &rarr;</button>
                 </div>
             </div>
@@ -353,5 +370,8 @@
 
     <script src="scripts/dashboard-logic.js"></script>
     <script src="scripts/request-modal.js"></script>
+    <script src="scripts/pdf-generator.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>

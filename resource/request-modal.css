@@ -286,6 +286,12 @@
     border-top: 1px solid var(--db-field-border, rgba(255,255,255,0.08));
 }
 
+.footer-right-actions {
+    display: flex;
+    gap: 12px; /* Space between Export and Next/Finish */
+    align-items: center;
+}
+
 .db-modal .back-btn {
     background: transparent;
     border: 1px solid var(--db-field-border, rgba(255,255,255,0.08));
@@ -462,6 +468,44 @@
 
     /* ADD THIS */
     z-index: 10;
+}
+
+.db-modal-pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 9px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    border: 1px solid var(--db-accent, #3B82F6);
+    background: rgba(59, 130, 246, 0.08);
+    color: var(--db-accent, #3B82F6);
+    
+    /* REMOVE margin: 0 auto; if it's there */
+    margin: 0 !important; 
+}
+
+.db-modal-pdf-btn:hover {
+    background: var(--db-accent, #3B82F6);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+}
+
+[data-theme="dark"] .db-modal-pdf-btn {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: #60a5fa;
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .db-modal-pdf-btn:hover {
+    background: #3B82F6;
+    color: #ffffff;
 }
 
 .db-modal-close {
