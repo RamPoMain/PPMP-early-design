@@ -684,24 +684,36 @@
          NEW REQUEST MODAL
          ========================================================= -->
 
-        <div id="ppmpChoiceModalOverlay" class="db-modal-overlay hidden" style="z-index: 2000;">
-        <div class="db-modal" style="max-width: 440px; padding: 34px 30px 26px;">
+    <!-- START A NEW REQUEST CHOICE MODAL -->
+    <div id="ppmpChoiceModalOverlay" class="db-modal-overlay hidden">
+        <!-- Added 'choice-modal' class, removed inline padding/width -->
+        <div class="db-modal choice-modal">
             <button type="button" class="db-modal-close" onclick="closePpmpChoiceModal()" aria-label="Close">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </button>
-            <div class="title-tab-wrapper" style="position: static; transform: none; margin-bottom: 20px; pointer-events: auto;">
-                <p class="text-9">START A REQUEST</p>
+
+            <!-- Floating Title Tab -->
+            <div class="title-tab-wrapper">
+                <p class="text-9">START A NEW REQUEST</p>
             </div>
-            <p style="color: var(--db-text-dim, #8B94A8); font-size: 13.5px; line-height: 1.5; margin-bottom: 18px;">
-                You have a PPMP that isn't approved yet. Add this as another entry under it, or start a brand-new PPMP.
-            </p>
-            <div class="field-group" style="margin-bottom: 22px;">
-                <label for="pendingPpmpSelect">Pending PPMP</label>
-                <select id="pendingPpmpSelect"></select>
-            </div>
-            <div class="footer-actions" style="margin-top: 0; padding-top: 0; border-top: none; justify-content: space-between;">
-                <button type="button" class="back-btn" onclick="startBrandNewPpmp()">Start New PPMP</button>
-                <button type="button" class="next-btn" onclick="confirmAddToSelectedPpmp()">Add Entry →</button>
+
+            <div class="choice-modal-content">
+                <p class="choice-description">
+                    You have a PPMP that isn't approved yet. Add this as another entry under it, or start a brand-new PPMP.
+                </p>
+
+                <div class="field-group" data-field="pending_ppmp">
+                    <label for="pendingPpmpSelect">Pending PPMP</label>
+                    <div class="select-wrapper">
+                        <select id="pendingPpmpSelect" required></select>
+                        <img src="images/vector-43.svg" class="custom-chevron">
+                    </div>
+                </div>
+
+                <div class="footer-actions choice-footer">
+                    <button type="button" class="back-btn" onclick="startBrandNewPpmp()">Start New PPMP</button>
+                    <button type="button" class="next-btn" onclick="confirmAddToSelectedPpmp()">Add Entry &rarr;</button>
+                </div>
             </div>
         </div>
     </div>
