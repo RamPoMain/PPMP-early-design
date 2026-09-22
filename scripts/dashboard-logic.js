@@ -52,6 +52,21 @@ function escapeHtml(value) {
 }
 
 
+// Redirects an "add another entry" click on this PPMP into the request
+// modal. Works whether we're already on a page that has the modal
+// (index.html/profile.html — open it straight away) or on entries.html,
+// which doesn't have the modal markup, so we stash the target PPMP and
+// hop to index.html, which picks it up on load (see DOMContentLoaded below).
+function requestAddEntryToPpmp(ppmpNo) {
+    if (typeof addEntryToPpmp === 'function' && document.getElementById('requestModalOverlay')) {
+        addEntryToPpmp(ppmpNo);
+    } else {
+        sessionStorage.setItem('add_entry_ppmp', ppmpNo);
+        window.location.href = 'index.html';
+    }
+}
+
+
 function formatRelativeTime(timestamp) {
 
     const diffMs = Date.now() - timestamp;
@@ -421,6 +436,11 @@ function renderEntries(records) {
                 <td><span class="db-status-pill ${status === 'Completed' ? 'is-completed' : 'is-pending'}">${status}</span></td>
                 <td>
                     <div class="db-entry-actions">
+                        ${status === 'Pending' ? `
+                        <button class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
+                        </button>
+                        ` : ''}
                         <button class="db-action-btn" title="Preview Excel Format" onclick="openExcelPreview(${recordId})">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V18.5C20 19.3 19.3 20 18.5 20H5.5C4.7 20 4 19.3 4 18.5V5.5Z"/><path d="M4 9H20M4 14H20M9 4V20M15 4V20"/></svg>
                         </button>
@@ -592,11 +612,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const openRecordId = sessionStorage.getItem('open_record_id');
     const shouldOpenNewRequest = sessionStorage.getItem('open_new_request') === '1';
+    const addEntryPpmp = sessionStorage.getItem('add_entry_ppmp');
 
     if (openRecordId && typeof openRequestModal === 'function') {
         sessionStorage.removeItem('open_record_id');
         setTimeout(function () {
             openRequestModal(openRecordId);
+        }, 0);
+    } else if (addEntryPpmp && typeof addEntryToPpmp === 'function') {
+        sessionStorage.removeItem('add_entry_ppmp');
+        setTimeout(function () {
+            addEntryToPpmp(addEntryPpmp);
+        }, 0);
+    } else if (shouldOpenNewRequest && typeof startNewRequest === 'function') {
+        sessionStorage.removeItem('open_new_request');
+        setTimeout(function () {
+            startNewRequest();
         }, 0);
     } else if (shouldOpenNewRequest && typeof openRequestModal === 'function') {
         sessionStorage.removeItem('open_new_request');

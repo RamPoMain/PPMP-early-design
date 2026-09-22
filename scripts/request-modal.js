@@ -270,6 +270,89 @@ function initializeFiscalYear() {
 
 
 // ============================================================
+// ADD ENTRY TO AN EXISTING (NOT YET APPROVED) PPMP
+// A PPMP can hold more than one entry. While it still has at least one
+// Pending entry, it isn't approved yet, so the user can add another entry
+// under the same PPMP No. / fiscal year instead of starting a brand-new one.
+// ============================================================
+
+function getPendingPpmpGroups() {
+    const records = typeof getRecords === 'function' ? getRecords() : [];
+    const groups = new Map();
+
+    records.forEach(record => {
+        if (record.status !== 'Pending') return;
+
+        const key = String(record.ppmp_no || 'N/A');
+
+        if (!groups.has(key)) {
+            groups.set(key, { ppmp_no: key, fiscal_year: record.fiscal_year, count: 0 });
+        }
+
+        groups.get(key).count += 1;
+    });
+
+    return [...groups.values()].sort((a, b) =>
+        String(a.ppmp_no).localeCompare(String(b.ppmp_no), undefined, { numeric: true })
+    );
+}
+
+
+function startNewRequest() {
+    const groups = getPendingPpmpGroups();
+    const chooser = document.getElementById('ppmpChoiceModalOverlay');
+
+    if (groups.length === 0 || !chooser) {
+        openRequestModal();
+        return;
+    }
+
+    openPpmpChoiceModal(groups);
+}
+
+
+function openPpmpChoiceModal(groups) {
+    const overlay = document.getElementById('ppmpChoiceModalOverlay');
+    const select = document.getElementById('pendingPpmpSelect');
+
+    if (!overlay || !select) {
+        openRequestModal();
+        return;
+    }
+
+    const esc = typeof escapeHtml === 'function' ? escapeHtml : (v => String(v ?? ''));
+
+    select.innerHTML = groups.map(group =>
+        `<option value="${esc(group.ppmp_no)}">PPMP No. ${esc(group.ppmp_no)} — FY ${esc(group.fiscal_year || 'N/A')} (${group.count} ${group.count === 1 ? 'entry' : 'entries'})</option>`
+    ).join('');
+
+    overlay.classList.remove('hidden');
+}
+
+
+function closePpmpChoiceModal() {
+    const overlay = document.getElementById('ppmpChoiceModalOverlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+
+function confirmAddToSelectedPpmp() {
+    const select = document.getElementById('pendingPpmpSelect');
+    const ppmpNo = select && select.value;
+
+    closePpmpChoiceModal();
+
+    if (ppmpNo) addEntryToPpmp(ppmpNo);
+}
+
+
+function startBrandNewPpmp() {
+    closePpmpChoiceModal();
+    openRequestModal();
+}
+
+
+// ============================================================
 // NUMBER-ONLY INPUT RESTRICTIONS
 // ============================================================
 
@@ -2265,6 +2348,42 @@ function openRequestModal(id = null) {
         initializePpmpNumber();
         initializeFiscalYear();
         document.getElementById('finishBtn').innerText = 'Finish →';
+    }
+}
+
+
+function addEntryToPpmp(ppmpNo) {
+    // Same as a normal "new request", except the PPMP No. / fiscal year are
+    // locked to the PPMP the user picked instead of getting a fresh number,
+    // so this entry is grouped with the others already under it.
+    resetRequestForm();
+
+    const overlay = document.getElementById('requestModalOverlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    currentEditingId = null;
+    isViewMode = false;
+    enableModalFields(); // also sets ppmp_no / fiscal_year readOnly = true
+
+    const records = typeof getRecords === 'function' ? getRecords() : [];
+    const groupRecord = records.find(r => String(r.ppmp_no) === String(ppmpNo));
+
+    const ppmpField = document.getElementById('ppmp_no');
+    if (ppmpField) ppmpField.value = ppmpNo;
+
+    const fiscalYearField = document.getElementById('fiscal_year');
+    if (fiscalYearField) {
+        fiscalYearField.value = (groupRecord && groupRecord.fiscal_year) || new Date().getFullYear();
+    }
+
+    document.getElementById('finishBtn').innerText = 'Finish \u2192';
+    document.getElementById('page-title').innerText = 'NEW ENTRY \u2014 PPMP NO. ' + ppmpNo;
+
+    if (typeof showToast === 'function') {
+        showToast(`Adding a new entry under PPMP No. ${ppmpNo}.`);
     }
 }
 
