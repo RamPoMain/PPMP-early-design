@@ -353,15 +353,18 @@ function closeExcelPreview() {
 
 function getFilteredEntryRecords(records) {
     const statusFilter = document.getElementById('entryStatusFilter');
+    const indicativeFilter = document.getElementById('entryIndicativeFilter');
     const typeFilter = document.getElementById('entryTypeFilter');
     const searchInput = document.getElementById('entrySearchInput');
 
     const statusValue = statusFilter ? statusFilter.value : 'All';
+    const indicativeValue = indicativeFilter ? indicativeFilter.value : 'All';
     const typeValue = typeFilter ? typeFilter.value : 'All';
     const searchValue = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     return records.filter(record => {
         const statusMatches = statusValue === 'All' || record.status === statusValue;
+        const indicativeMatches = indicativeValue === 'All' || record.is_indicative === indicativeValue;
         const typeMatches = typeValue === 'All' || record.project_type === typeValue;
         const searchHaystack = [
             record.ppmp_no,
@@ -372,7 +375,7 @@ function getFilteredEntryRecords(records) {
             record.fiscal_year
         ].join(' ').toLowerCase();
 
-        return statusMatches && typeMatches && (!searchValue || searchHaystack.includes(searchValue));
+        return statusMatches && indicativeMatches && typeMatches && (!searchValue || searchHaystack.includes(searchValue));
     });
 }
 
@@ -420,6 +423,7 @@ function renderEntries(records) {
 
     tbody.innerHTML = filteredRecords.map(record => {
         const status = record.status === 'Completed' ? 'Completed' : 'Pending';
+        const ppmpType = record.is_indicative === 'Final' ? 'Final' : (record.is_indicative === 'Indicative' ? 'Indicative' : 'N/A');
         const description = record.project_description || record.quantity_size || 'N/A';
         const budget = formatPeso(parseBudgetNumber(record.budget));
         const recordId = Number(record.id);
@@ -434,6 +438,7 @@ function renderEntries(records) {
                 <td>${escapeHtml(record.project_type || 'N/A')}</td>
                 <td>${escapeHtml(budget)}</td>
                 <td><span class="db-status-pill ${status === 'Completed' ? 'is-completed' : 'is-pending'}">${status}</span></td>
+                <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
                 <td>
                     <div class="db-entry-actions">
                         ${status === 'Pending' ? `
@@ -475,7 +480,7 @@ function refreshDashboardRecords() {
 
 
 function initEntryFilters() {
-    ['entryStatusFilter', 'entryTypeFilter', 'entrySearchInput'].forEach(id => {
+    ['entryStatusFilter', 'entryIndicativeFilter', 'entryTypeFilter', 'entrySearchInput'].forEach(id => {
         const control = document.getElementById(id);
         if (!control) return;
 
@@ -496,13 +501,8 @@ function openEntryRecord(id) {
         document.getElementById('requestModalOverlay')
     ) {
         openRequestModal(id);
-        return;
     }
-
-    sessionStorage.setItem('open_record_id', String(id));
-    window.location.href = 'index.html';
 }
-
 // Shared toast notification (used by every page that loads this file)
 function showToast(message) {
     let toast = document.getElementById('dbToast');

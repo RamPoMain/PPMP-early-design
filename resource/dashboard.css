@@ -601,6 +601,16 @@ html[data-theme="light"] {
     color: var(--db-green);
 }
 
+.db-status-pill.is-type-indicative {
+    background: var(--db-accent-soft);
+    color: var(--db-accent);
+}
+
+.db-status-pill.is-type-final {
+    background: var(--db-violet-soft);
+    color: var(--db-violet);
+}
+
 .db-entry-actions {
     display: flex;
     gap: 8px;
