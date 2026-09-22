@@ -52,6 +52,70 @@ function escapeHtml(value) {
 }
 
 
+// ============================================================
+// PPMP LINE ITEMS
+// A PPMP record can hold more than one procurement line item, kept in
+// record.items[]. Records saved before multi-item support only have a
+// single item's fields directly on the record — getRecordItems()
+// normalizes both shapes so the rest of the app never has to care which
+// one it's looking at.
+// ============================================================
+
+function getRecordItems(record) {
+    if (!record) return [];
+
+    if (Array.isArray(record.items) && record.items.length > 0) {
+        return record.items;
+    }
+
+    return [{
+        id: record.id,
+        project_description: record.project_description,
+        project_type: record.project_type,
+        mode: record.mode,
+        pre_procurement: record.pre_procurement,
+        quantity_size: record.quantity_size,
+        start_date: record.start_date,
+        end_date: record.end_date,
+        delivery_period: record.delivery_period,
+        fund_source: record.fund_source,
+        budget: record.budget,
+        strategies: record.strategies || [],
+        remarks: record.remarks,
+        supporting_documents: record.supporting_documents || []
+    }];
+}
+
+
+function getRecordTotalBudget(record) {
+    return getRecordItems(record).reduce(
+        (sum, item) => sum + parseBudgetNumber(item.budget),
+        0
+    );
+}
+
+
+function getRecordDescriptionSummary(record) {
+    const items = getRecordItems(record);
+    if (items.length === 0) return 'N/A';
+
+    const first = items[0].project_description || items[0].quantity_size || 'N/A';
+    const extra = items.length - 1;
+
+    return extra > 0 ? `${first} (+${extra} more item${extra === 1 ? '' : 's'})` : first;
+}
+
+
+function getRecordProjectTypeSummary(record) {
+    const items = getRecordItems(record);
+    const types = [...new Set(items.map(item => item.project_type).filter(Boolean))];
+
+    if (types.length === 0) return 'N/A';
+    if (types.length === 1) return types[0];
+    return 'Mixed';
+}
+
+
 // Redirects an "add another entry" click on this PPMP into the request
 // modal. Works whether we're already on a page that has the modal
 // (index.html/profile.html — open it straight away) or on entries.html,
@@ -102,7 +166,7 @@ function renderStats(records) {
         records.filter(r => r.status === 'Completed').length;
 
     const totalBudget = records.reduce(
-        (sum, record) => sum + parseBudgetNumber(record.budget),
+        (sum, record) => sum + getRecordTotalBudget(record),
         0
     );
 
@@ -177,13 +241,33 @@ function renderActivity(records) {
 
 
 function buildExcelPreviewMarkup(record) {
-    const numericBudget = parseBudgetNumber(record.budget);
-    const formattedBudget = formatPesoExact(numericBudget);
     const isIndicative = record.is_indicative === 'Indicative';
     const isFinal = record.is_indicative === 'Final';
-    const strategies = Array.isArray(record.strategies)
-        ? record.strategies.join(', ')
-        : record.strategies || '';
+    const items = getRecordItems(record);
+    const formattedTotal = formatPesoExact(getRecordTotalBudget(record));
+
+    const itemRows = items.map(item => {
+        const itemStrategies = Array.isArray(item.strategies)
+            ? item.strategies.join(', ')
+            : item.strategies || '';
+
+        return `
+                        <tr>
+                            <td>${escapeHtml(item.project_description || '')}</td>
+                            <td>${escapeHtml(item.project_type || '')}</td>
+                            <td>${escapeHtml(item.quantity_size || '')}</td>
+                            <td>${escapeHtml(item.mode || '')}</td>
+                            <td>${escapeHtml(item.pre_procurement || '')}</td>
+                            <td>${escapeHtml(item.start_date || '')}</td>
+                            <td>${escapeHtml(item.end_date || '')}</td>
+                            <td>${escapeHtml(item.delivery_period || '')}</td>
+                            <td>${escapeHtml(item.fund_source || '')}</td>
+                            <td>${escapeHtml(formatPesoExact(parseBudgetNumber(item.budget)))}</td>
+                            <td>${escapeHtml(itemStrategies)}</td>
+                            <td>${escapeHtml(item.remarks || '')}</td>
+                        </tr>
+        `;
+    }).join('');
 
     return `
         <div class="excel-preview-sheet">
@@ -241,23 +325,10 @@ function buildExcelPreviewMarkup(record) {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>${escapeHtml(record.project_description || '')}</td>
-                            <td>${escapeHtml(record.project_type || '')}</td>
-                            <td>${escapeHtml(record.quantity_size || '')}</td>
-                            <td>${escapeHtml(record.mode || '')}</td>
-                            <td>${escapeHtml(record.pre_procurement || '')}</td>
-                            <td>${escapeHtml(record.start_date || '')}</td>
-                            <td>${escapeHtml(record.end_date || '')}</td>
-                            <td>${escapeHtml(record.delivery_period || '')}</td>
-                            <td>${escapeHtml(record.fund_source || '')}</td>
-                            <td>${escapeHtml(formattedBudget)}</td>
-                            <td>${escapeHtml(strategies)}</td>
-                            <td>${escapeHtml(record.remarks || '')}</td>
-                        </tr>
+                        ${itemRows}
                         <tr>
                             <td colspan="9" class="excel-total-label">TOTAL BUDGET:</td>
-                            <td class="excel-total-value">${escapeHtml(formattedBudget)}</td>
+                            <td class="excel-total-value">${escapeHtml(formattedTotal)}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -363,16 +434,17 @@ function getFilteredEntryRecords(records) {
     const searchValue = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     return records.filter(record => {
+        const items = getRecordItems(record);
         const statusMatches = statusValue === 'All' || record.status === statusValue;
         const indicativeMatches = indicativeValue === 'All' || record.is_indicative === indicativeValue;
-        const typeMatches = typeValue === 'All' || record.project_type === typeValue;
+        const typeMatches = typeValue === 'All' || items.some(item => item.project_type === typeValue);
         const searchHaystack = [
             record.ppmp_no,
-            record.project_description,
             record.end_user,
-            record.project_type,
-            record.mode,
-            record.fiscal_year
+            record.fiscal_year,
+            ...items.map(item => item.project_description),
+            ...items.map(item => item.project_type),
+            ...items.map(item => item.mode)
         ].join(' ').toLowerCase();
 
         return statusMatches && indicativeMatches && typeMatches && (!searchValue || searchHaystack.includes(searchValue));
@@ -424,8 +496,8 @@ function renderEntries(records) {
     tbody.innerHTML = filteredRecords.map(record => {
         const status = record.status === 'Completed' ? 'Completed' : 'Pending';
         const ppmpType = record.is_indicative === 'Final' ? 'Final' : (record.is_indicative === 'Indicative' ? 'Indicative' : 'N/A');
-        const description = record.project_description || record.quantity_size || 'N/A';
-        const budget = formatPeso(parseBudgetNumber(record.budget));
+        const description = getRecordDescriptionSummary(record);
+        const budget = formatPeso(getRecordTotalBudget(record));
         const recordId = Number(record.id);
         const entryNumber = approvedNumbers.get(String(record.id));
 
@@ -435,7 +507,7 @@ function renderEntries(records) {
                 <td><strong>PPMP No. ${escapeHtml(record.ppmp_no || 'N/A')}</strong><span>${escapeHtml(record.fiscal_year || '')}</span></td>
                 <td class="db-entry-description">${escapeHtml(description)}</td>
                 <td>${escapeHtml(record.end_user || 'N/A')}</td>
-                <td>${escapeHtml(record.project_type || 'N/A')}</td>
+                <td>${escapeHtml(getRecordProjectTypeSummary(record))}</td>
                 <td>${escapeHtml(budget)}</td>
                 <td><span class="db-status-pill ${status === 'Completed' ? 'is-completed' : 'is-pending'}">${status}</span></td>
                 <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
@@ -524,15 +596,56 @@ function showToast(message) {
 }
 
 
-// Function to Delete a record
-let recordIdToDelete = null;
+// Function to Delete a record (or a single line item within one)
+// pendingDelete shape: { type: 'record', id } or { type: 'item', recordId, itemId }
+let pendingDelete = null;
 
-// 1. Function called when clicking the trash icon
+// Swaps the confirm modal's heading/message. Falls back to doing nothing
+// if a page (e.g. one without the delete feature) doesn't have these ids.
+function setConfirmModalText(title, message) {
+    const titleEl = document.getElementById('confirmModalTitle');
+    const textEl = document.getElementById('confirmModalText');
+    if (titleEl) titleEl.textContent = title;
+    if (textEl) textEl.textContent = message;
+}
+
+// 1. Function called when clicking the trash icon on a whole PPMP row
 function deleteRecord(id) {
-    recordIdToDelete = id; // Store the ID we want to delete
+    pendingDelete = { type: 'record', id: id };
+    setConfirmModalText(
+        'Delete Request?',
+        'Are you sure you want to delete this procurement request? This action cannot be undone.'
+    );
     const confirmModal = document.getElementById('confirmModalOverlay');
     confirmModal.classList.remove('hidden');
     document.body.style.overflow = 'hidden'; // Stop background scrolling
+}
+
+// 1b. Function called when clicking "Delete Item" while viewing a single
+// line item inside the request modal. Warns up front if this is the only
+// item left, since removing it removes the whole PPMP.
+function deleteRecordItem(recordId, itemId) {
+    if (!recordId || !itemId) return;
+
+    const confirmModal = document.getElementById('confirmModalOverlay');
+    if (!confirmModal) return; // page has no delete UI (e.g. Profile)
+
+    const records = getRecords();
+    const record = records.find(r => r.id == recordId);
+    const items = record && typeof getRecordItems === 'function' ? getRecordItems(record) : [];
+    const isOnlyItem = items.length <= 1;
+
+    pendingDelete = { type: 'item', recordId: recordId, itemId: itemId };
+
+    setConfirmModalText(
+        isOnlyItem ? 'Delete Request?' : 'Delete This Item?',
+        isOnlyItem
+            ? 'This is the only item on this PPMP, so deleting it will delete the entire request. This action cannot be undone.'
+            : 'Are you sure you want to delete this line item from the PPMP? This action cannot be undone.'
+    );
+
+    confirmModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
 // 2. Function to close the popup
@@ -540,7 +653,7 @@ function closeConfirmModal() {
     const confirmModal = document.getElementById('confirmModalOverlay');
     confirmModal.classList.add('hidden');
     document.body.style.overflow = '';
-    recordIdToDelete = null;
+    pendingDelete = null;
 }
 
 // 3. Event Listener for the actual "Delete" button inside the popup
@@ -548,15 +661,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmBtn = document.getElementById('confirmDeleteBtn');
     if (confirmBtn) {
         confirmBtn.onclick = function() {
-            if (recordIdToDelete !== null) {
-                executeDeletion(recordIdToDelete);
-                closeConfirmModal();
+            if (!pendingDelete) return;
+
+            if (pendingDelete.type === 'item') {
+                executeItemDeletion(pendingDelete.recordId, pendingDelete.itemId);
+            } else if (pendingDelete.type === 'record') {
+                executeDeletion(pendingDelete.id);
             }
+
+            closeConfirmModal();
         };
     }
 });
 
-// 4. The actual deletion logic
+// 4. The actual whole-record deletion logic
 function executeDeletion(id) {
     let records = JSON.parse(localStorage.getItem('procurement_records')) || [];
     records = records.filter(r => r.id !== id);
@@ -568,6 +686,46 @@ function executeDeletion(id) {
     // Show the Toast notification (if you have the function)
     if (typeof showToast === 'function') {
         showToast("Request deleted successfully.");
+    }
+}
+
+// 4b. Deletes a single line item from a PPMP record. If it was the last
+// remaining item, the whole record is removed instead (a PPMP with zero
+// items has nothing left to show).
+function executeItemDeletion(recordId, itemId) {
+    let records = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const idx = records.findIndex(r => r.id == recordId);
+    if (idx === -1) return;
+
+    const remainingItems = getRecordItems(records[idx]).filter(it => it.id != itemId);
+    const wholeRecordRemoved = remainingItems.length === 0;
+
+    if (wholeRecordRemoved) {
+        records.splice(idx, 1);
+    } else {
+        records[idx] = Object.assign({}, records[idx], { items: remainingItems });
+    }
+
+    localStorage.setItem('procurement_records', JSON.stringify(records));
+
+    refreshDashboardRecords();
+
+    // If the request modal is currently open on this same record, keep it
+    // in sync: jump to a neighboring item, or close it if nothing is left.
+    if (typeof currentEditingId !== 'undefined' && currentEditingId == recordId) {
+        if (wholeRecordRemoved) {
+            if (typeof closeRequestModal === 'function') closeRequestModal();
+        } else if (typeof loadRecordIntoModal === 'function') {
+            const nextIndex = Math.min(
+                typeof currentItemIndex === 'number' ? currentItemIndex : 0,
+                remainingItems.length - 1
+            );
+            loadRecordIntoModal(recordId, nextIndex);
+        }
+    }
+
+    if (typeof showToast === 'function') {
+        showToast(wholeRecordRemoved ? 'Request deleted successfully.' : 'Item deleted successfully.');
     }
 }
 

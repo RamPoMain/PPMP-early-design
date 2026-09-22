@@ -284,12 +284,13 @@ function getPendingPpmpGroups() {
         if (record.status !== 'Pending') return;
 
         const key = String(record.ppmp_no || 'N/A');
+        const itemCount = (typeof getRecordItems === 'function' ? getRecordItems(record) : [record]).length;
 
         if (!groups.has(key)) {
             groups.set(key, { ppmp_no: key, fiscal_year: record.fiscal_year, count: 0 });
         }
 
-        groups.get(key).count += 1;
+        groups.get(key).count += itemCount;
     });
 
     return [...groups.values()].sort((a, b) =>
@@ -557,41 +558,24 @@ function saveProcurementRequest() {
             )
         ) || [];
 
-    // currentEditingId is set by openRequestModal()/loadRecordIntoModal()
-    // whenever we opened this modal against a saved record. If the user
-    // clicked Edit and is now saving, this is an update, not a new entry.
+    // currentEditingId is set by openRequestModal()/loadRecordIntoModal()/
+    // addEntryToPpmp() whenever this save targets an existing PPMP record.
+    // currentEditingItemId then tells us whether we're updating one of its
+    // existing items (set) or appending a brand-new one (null).
     const existingRecord = currentEditingId
         ? db.find(r => r.id == currentEditingId)
         : null;
 
-    const entry = {
-
+    // Everything specific to this one procurement project — as opposed to
+    // the PPMP header info (ppmp_no, fiscal year, end-user, indicative/final)
+    // that's shared by every item under the same PPMP.
+    const itemPayload = {
         id:
-            existingRecord ? existingRecord.id : Date.now(),
+            (existingRecord && currentEditingItemId) ? currentEditingItemId : Date.now(),
 
-        ppmp_no:
-            document.getElementById(
-                'ppmp_no'
-            ).value || 'N/A',
-        
-        project_description: 
+        project_description:
             document.getElementById(
                 'project_description'
-            ).value,
-
-        is_indicative:
-            document.getElementById(
-                'is_indicative'
-            ).value,
-
-        end_user:
-            document.getElementById(
-                'end_user'
-            ).value || 'N/A',
-
-        fiscal_year:
-            document.getElementById(
-                'fiscal_year'
             ).value,
 
         project_type:
@@ -658,17 +642,77 @@ function saveProcurementRequest() {
 
                 dataUrl:
                     entry.dataUrl
-            })),
-
-        status:
-            existingRecord ? existingRecord.status : 'Pending',
-
-        approved_at:
-            existingRecord ? existingRecord.approved_at : undefined,
-
-        date:
-            existingRecord ? existingRecord.date : new Date().toLocaleDateString()
+            }))
     };
+
+    let entry;
+    let isNewItem = false;
+
+    if (existingRecord) {
+        // Updating the PPMP header, plus either replacing one existing
+        // item or appending a brand-new one onto the same record — this
+        // is what keeps "Add another entry" from creating a second row
+        // in Entries.
+        const items = (typeof getRecordItems === 'function' ? getRecordItems(existingRecord) : [existingRecord]).slice();
+
+        if (currentEditingItemId) {
+            const idx = items.findIndex(it => it.id == currentEditingItemId);
+            if (idx !== -1) {
+                items[idx] = itemPayload;
+            } else {
+                items.push(itemPayload);
+                isNewItem = true;
+            }
+        } else {
+            items.push(itemPayload);
+            isNewItem = true;
+        }
+
+        entry = {
+            id: existingRecord.id,
+
+            ppmp_no:
+                document.getElementById('ppmp_no').value || existingRecord.ppmp_no || 'N/A',
+
+            is_indicative:
+                document.getElementById('is_indicative').value || existingRecord.is_indicative,
+
+            end_user:
+                document.getElementById('end_user').value || existingRecord.end_user || 'N/A',
+
+            fiscal_year:
+                document.getElementById('fiscal_year').value || existingRecord.fiscal_year,
+
+            items: items,
+
+            status: existingRecord.status,
+            approved_at: existingRecord.approved_at,
+            date: existingRecord.date
+        };
+    } else {
+        // Brand-new PPMP, with this as its first line item.
+        entry = {
+            id: Date.now(),
+
+            ppmp_no:
+                document.getElementById('ppmp_no').value || 'N/A',
+
+            is_indicative:
+                document.getElementById('is_indicative').value,
+
+            end_user:
+                document.getElementById('end_user').value || 'N/A',
+
+            fiscal_year:
+                document.getElementById('fiscal_year').value,
+
+            items: [itemPayload],
+
+            status: 'Pending',
+            approved_at: undefined,
+            date: new Date().toLocaleDateString()
+        };
+    }
 
 
     if (existingRecord) {
@@ -701,9 +745,11 @@ function saveProcurementRequest() {
         }
 
         showToast(
-            existingRecord
-                ? `Request "PPMP No. ${entry.ppmp_no}" was updated successfully.`
-                : `Request "PPMP No. ${entry.ppmp_no}" was saved successfully.`
+            isNewItem
+                ? `New item added under PPMP No. ${entry.ppmp_no}.`
+                : (existingRecord
+                    ? `Request "PPMP No. ${entry.ppmp_no}" was updated successfully.`
+                    : `Request "PPMP No. ${entry.ppmp_no}" was saved successfully.`)
         );
 
     } catch (err) {
@@ -2251,6 +2297,12 @@ function initFileUpload() {
 
 function resetRequestForm() {
 
+    // Clear which item (if any) we were viewing/editing within a PPMP —
+    // a fresh form always starts as "brand-new PPMP, first item".
+    currentEditingItemId = null;
+    currentItemIndex = 0;
+    hideItemNavigator();
+
     // Clear every text/select/textarea value in the modal
     document
         .querySelectorAll(
@@ -2314,6 +2366,9 @@ function resetRequestForm() {
     const verifyBtn = document.getElementById('verifyRequestBtn');
     if (verifyBtn) verifyBtn.classList.add('hidden');
 
+    const deleteItemBtn = document.getElementById('deleteItemBtn');
+    if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+
     const statusBadge = document.getElementById('modalStatusBadge');
     if (statusBadge) statusBadge.classList.add('hidden');
 
@@ -2326,6 +2381,8 @@ function resetRequestForm() {
 
 
 let currentEditingId = null; // Track if we are viewing/editing
+let currentEditingItemId = null; // Which item within that PPMP is loaded (null = adding a new one)
+let currentItemIndex = 0; // Which item the on-screen navigator is pointing at
 
 function openRequestModal(id = null) {
     resetRequestForm(); // Clear everything first
@@ -2353,9 +2410,10 @@ function openRequestModal(id = null) {
 
 
 function addEntryToPpmp(ppmpNo) {
-    // Same as a normal "new request", except the PPMP No. / fiscal year are
-    // locked to the PPMP the user picked instead of getting a fresh number,
-    // so this entry is grouped with the others already under it.
+    // Same form as a normal "new request", except this save appends a new
+    // line item onto the existing PPMP record (currentEditingId) instead
+    // of creating a brand-new one — so it shows up as one more item under
+    // the same row in Entries, not a separate entry.
     resetRequestForm();
 
     const overlay = document.getElementById('requestModalOverlay');
@@ -2364,12 +2422,13 @@ function addEntryToPpmp(ppmpNo) {
     overlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 
-    currentEditingId = null;
-    isViewMode = false;
-    enableModalFields(); // also sets ppmp_no / fiscal_year readOnly = true
-
     const records = typeof getRecords === 'function' ? getRecords() : [];
     const groupRecord = records.find(r => String(r.ppmp_no) === String(ppmpNo));
+
+    currentEditingId = groupRecord ? groupRecord.id : null;
+    currentEditingItemId = null; // null here means "this save creates a new item"
+    isViewMode = false;
+    enableModalFields(); // also sets ppmp_no / fiscal_year readOnly = true
 
     const ppmpField = document.getElementById('ppmp_no');
     if (ppmpField) ppmpField.value = ppmpNo;
@@ -2377,17 +2436,85 @@ function addEntryToPpmp(ppmpNo) {
     const fiscalYearField = document.getElementById('fiscal_year');
     if (fiscalYearField) {
         fiscalYearField.value = (groupRecord && groupRecord.fiscal_year) || new Date().getFullYear();
+        fiscalYearField.readOnly = true;
     }
 
+    // end_user and is_indicative describe the PPMP as a whole, not this one
+    // item, so lock them to the group's existing values — a second item
+    // can't disagree with the first about who the PPMP is for.
+    const endUserField = document.getElementById('end_user');
+    if (endUserField) {
+        endUserField.value = (groupRecord && groupRecord.end_user) || '';
+        endUserField.readOnly = true;
+    }
+
+    const indicativeField = document.getElementById('is_indicative');
+    if (indicativeField) {
+        indicativeField.value = (groupRecord && groupRecord.is_indicative) || '';
+        indicativeField.disabled = true;
+    }
+
+    hideItemNavigator();
+
     document.getElementById('finishBtn').innerText = 'Finish \u2192';
-    document.getElementById('page-title').innerText = 'NEW ENTRY \u2014 PPMP NO. ' + ppmpNo;
+    document.getElementById('page-title').innerText = 'NEW ITEM \u2014 PPMP NO. ' + ppmpNo;
 
     if (typeof showToast === 'function') {
-        showToast(`Adding a new entry under PPMP No. ${ppmpNo}.`);
+        showToast(`Adding a new line item under PPMP No. ${ppmpNo}.`);
     }
 }
 
-function loadRecordIntoModal(id) {
+
+// ============================================================
+// ITEM NAVIGATOR
+// Shown above the form whenever the PPMP being viewed has more than one
+// line item, so the user can step between them without leaving the modal.
+// ============================================================
+
+function hideItemNavigator() {
+    const nav = document.getElementById('modalItemNav');
+    if (nav) nav.classList.add('hidden');
+}
+
+function renderItemNavigator(recordId, items, currentIndex) {
+    const wrapper = document.querySelector('#requestModalOverlay .title-tab-wrapper');
+    if (!wrapper) return;
+
+    if (!items || items.length <= 1) {
+        hideItemNavigator();
+        return;
+    }
+
+    let nav = document.getElementById('modalItemNav');
+
+    if (!nav) {
+        nav = document.createElement('div');
+        nav.id = 'modalItemNav';
+        nav.className = 'modal-item-nav';
+        nav.innerHTML =
+            '<button type="button" class="modal-item-nav-btn" id="modalItemPrev" aria-label="Previous item">&larr;</button>' +
+            '<span id="modalItemNavLabel"></span>' +
+            '<button type="button" class="modal-item-nav-btn" id="modalItemNext" aria-label="Next item">&rarr;</button>';
+        wrapper.insertAdjacentElement('afterend', nav);
+    }
+
+    nav.classList.remove('hidden');
+    nav.querySelector('#modalItemNavLabel').textContent = `Item ${currentIndex + 1} of ${items.length}`;
+
+    const prevBtn = nav.querySelector('#modalItemPrev');
+    const nextBtn = nav.querySelector('#modalItemNext');
+
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === items.length - 1;
+
+    // Replace onclick each render so we always jump using the item index
+    // and record id that are current right now, not whatever was current
+    // the first time the navigator was created.
+    prevBtn.onclick = () => loadRecordIntoModal(recordId, currentIndex - 1);
+    nextBtn.onclick = () => loadRecordIntoModal(recordId, currentIndex + 1);
+}
+
+function loadRecordIntoModal(id, itemIndex = 0) {
     const pdfButtons = document.querySelectorAll('.pdf-btn-global');
     pdfButtons.forEach(btn => btn.style.display = 'inline-flex');
     const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
@@ -2395,24 +2522,33 @@ function loadRecordIntoModal(id) {
     if (!data) return;
 
     isViewMode = true;
+    currentEditingId = data.id;
 
-    // Fill Basic Fields
+    const items = typeof getRecordItems === 'function' ? getRecordItems(data) : [data];
+    const safeIndex = Math.min(Math.max(itemIndex, 0), items.length - 1);
+    const item = items[safeIndex] || {};
+
+    currentEditingItemId = item.id;
+    currentItemIndex = safeIndex;
+
+    // Fill header fields (shared by every item under this PPMP) plus this
+    // one item's own fields.
     const fieldMap = {
         'ppmp_no': data.ppmp_no,
-        'project_description': data.project_description,
         'is_indicative': data.is_indicative,
         'end_user': data.end_user,
         'fiscal_year': data.fiscal_year,
-        'project_type': data.project_type,
-        'modeOfProcurement': data.mode,
-        'pre_procurement': data.pre_procurement,
-        'quantity_size': data.quantity_size,
-        'start_date': data.start_date,
-        'end_date': data.end_date,
-        'delivery_period': data.delivery_period,
-        'fund_source': data.fund_source,
-        'budget': data.budget,
-        'remarks': data.remarks
+        'project_description': item.project_description,
+        'project_type': item.project_type,
+        'modeOfProcurement': item.mode,
+        'pre_procurement': item.pre_procurement,
+        'quantity_size': item.quantity_size,
+        'start_date': item.start_date,
+        'end_date': item.end_date,
+        'delivery_period': item.delivery_period,
+        'fund_source': item.fund_source,
+        'budget': item.budget,
+        'remarks': item.remarks
     };
 
     Object.keys(fieldMap).forEach(key => {
@@ -2423,22 +2559,21 @@ function loadRecordIntoModal(id) {
     updateDocTypeHint();
 
     // Load Strategies
-    selectedStrategies = data.strategies || [];
+    selectedStrategies = item.strategies || [];
     renderTags(document.getElementById('selectedTags'));
 
-    // Load Files (Visual only)
-    if (data.supporting_documents) {
-        uploadedFiles = data.supporting_documents.map(doc => ({
-            id: Math.random(),
-            file: { name: doc.name, size: doc.size },
-            dataUrl: doc.dataUrl,
-            // Browsers block target="_blank" navigation straight to a
-            // data: URL (silently opens a blank tab), so rebuild a real
-            // blob URL the link can actually open.
-            objectUrl: base64DataUrlToObjectUrl(doc.dataUrl) || doc.dataUrl
-        }));
-        renderUploadedFiles();
-    }
+    // Load Files (Visual only) — always reset first so switching to an
+    // item with no files doesn't leave the previous item's files showing.
+    uploadedFiles = (item.supporting_documents || []).map(doc => ({
+        id: Math.random(),
+        file: { name: doc.name, size: doc.size },
+        dataUrl: doc.dataUrl,
+        // Browsers block target="_blank" navigation straight to a
+        // data: URL (silently opens a blank tab), so rebuild a real
+        // blob URL the link can actually open.
+        objectUrl: base64DataUrlToObjectUrl(doc.dataUrl) || doc.dataUrl
+    }));
+    renderUploadedFiles();
 
     // Change UI for Viewing
     document.getElementById('page-title').innerText = "VIEWING REQUEST: " + data.ppmp_no;
@@ -2460,6 +2595,12 @@ function loadRecordIntoModal(id) {
     // Offer a way out of read-only mode
     const editBtn = document.getElementById('editRequestBtn');
     if (editBtn) editBtn.classList.remove('hidden');
+
+    // Let the user remove just this line item (rather than the whole PPMP)
+    const deleteItemBtn = document.getElementById('deleteItemBtn');
+    if (deleteItemBtn) deleteItemBtn.classList.remove('hidden');
+
+    renderItemNavigator(data.id, items, safeIndex);
 }
 
 // Reflects a record's status as a colored pill next to the modal title.
@@ -2526,15 +2667,32 @@ function toggleVerifyStatus() {
     );
 }
 
+// Deletes just the item currently shown in the modal, rather than the
+// whole PPMP — hands off to dashboard-logic.js, which owns the shared
+// confirm dialog, and refreshes/steps the modal once it's done.
+function deleteCurrentItem() {
+    if (!currentEditingId || !currentEditingItemId) return;
+
+    if (typeof deleteRecordItem === 'function') {
+        deleteRecordItem(currentEditingId, currentEditingItemId);
+    }
+}
+
 function enableEditMode() {
     isViewMode = false;
     enableModalFields();
+    hideItemNavigator();
 
     const editBtn = document.getElementById('editRequestBtn');
     if (editBtn) editBtn.classList.add('hidden');
 
     const verifyBtn = document.getElementById('verifyRequestBtn');
     if (verifyBtn) verifyBtn.classList.add('hidden');
+
+    // Deleting a single item only makes sense while read-only viewing it —
+    // once editing, "Save Changes" / "Cancel" are the relevant actions.
+    const deleteItemBtn = document.getElementById('deleteItemBtn');
+    if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
 
     // Reflect the mode switch in the title if it's still showing the
     // "viewing" label (it gets overwritten anyway on step navigation)
@@ -2579,6 +2737,8 @@ function closeRequestModal() {
     overlay.classList.add('hidden');
     document.body.style.overflow = '';
     currentEditingId = null;
+    currentEditingItemId = null;
+    hideItemNavigator();
 }
 
 

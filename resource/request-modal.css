@@ -106,6 +106,30 @@
     color: #fff;
 }
 
+/* Delete-this-item button: only shown while viewing a saved item, next
+   to Edit/Verify. Danger-red to match the record-level delete action. */
+.db-modal-delete-item-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 9px;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    border: 1px solid #ef4444;
+    background: rgba(239, 68, 68, 0.10);
+    color: #ef4444;
+}
+
+.db-modal-delete-item-btn:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
 .db-modal-close {
     position: absolute;
     top: 18px;
@@ -384,9 +408,11 @@
     .db-modal { padding: 26px 20px 20px; }
     .db-modal-header-actions { right: 54px; gap: 6px; }
     .db-modal-edit-btn,
-    .db-modal-verify-btn { padding: 7px 8px; font-size: 0; gap: 0; }
+    .db-modal-verify-btn,
+    .db-modal-delete-item-btn { padding: 7px 8px; font-size: 0; gap: 0; }
     .db-modal-edit-btn svg,
-    .db-modal-verify-btn svg { width: 15px; height: 15px; }
+    .db-modal-verify-btn svg,
+    .db-modal-delete-item-btn svg { width: 15px; height: 15px; }
     .db-modal .footer-actions { flex-direction: column-reverse; gap: 10px; }
     .db-modal .back-btn,
     .db-modal .next-btn { width: 100%; text-align: center; }
@@ -535,4 +561,45 @@
 
 .db-modal .title-tab-wrapper .modal-status-badge {
     pointer-events: none;
+}
+
+/* ---------------- Item navigator (multi-item PPMPs) ---------------- */
+
+.modal-item-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px auto 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--db-text-dim, #8B94A8);
+}
+
+.modal-item-nav.hidden {
+    display: none;
+}
+
+.modal-item-nav-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border: 1px solid var(--db-field-border, rgba(255,255,255,0.20));
+    background: var(--db-card-alt, #0F172A);
+    color: var(--db-text, #E7EAF3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.modal-item-nav-btn:hover:not(:disabled) {
+    border-color: var(--db-accent, #3B82F6);
+}
+
+.modal-item-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
 }

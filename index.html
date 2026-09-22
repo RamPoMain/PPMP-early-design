@@ -157,6 +157,10 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0 0-3l-1-1a2.1 2.1 0 0 0-3 0L4 15v5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13 6l5 5" stroke="currentColor" stroke-width="1.6"/></svg>
                     Edit
                 </button>
+                <button type="button" id="deleteItemBtn" class="db-modal-delete-item-btn hidden" onclick="deleteCurrentItem()" aria-label="Delete this item">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    Delete Item
+                </button>
             </div>
             <button type="button" class="db-modal-close" onclick="closeRequestModal()" aria-label="Close">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -383,8 +387,8 @@
                 <path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
             </svg>
         </div>
-        <h3 style="font-size: 18px; margin-bottom: 10px; color: var(--db-text, #E7EAF3);">Delete Request?</h3>
-        <p style="color: var(--db-text-dim, #8B94A8); font-size: 14px; margin-bottom: 30px; line-height: 1.5;">
+        <h3 id="confirmModalTitle" style="font-size: 18px; margin-bottom: 10px; color: var(--db-text, #E7EAF3);">Delete Request?</h3>
+        <p id="confirmModalText" style="color: var(--db-text-dim, #8B94A8); font-size: 14px; margin-bottom: 30px; line-height: 1.5;">
             Are you sure you want to delete this procurement request? This action cannot be undone.
         </p>
         <div style="display: flex; gap: 12px; justify-content: center;">

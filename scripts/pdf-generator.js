@@ -11,22 +11,40 @@ async function generatePPMP_PDF() {
 
     const data = {
         ppmp: getVal('ppmp_no'),
-        project_desc: getVal('project_description'), // Column 1
         type: getVal('is_indicative'),
         year: getVal('fiscal_year'),
-        unit: getVal('end_user'),
-        projType: getVal('project_type'),
-        quantity_size: getVal('quantity_size'), // Column 3
-        mode: getVal('modeOfProcurement'),
-        preProc: getVal('pre_procurement'),
-        start: getVal('start_date'),
-        end: getVal('end_date'),
-        delivery: getVal('delivery_period'),
-        source: getVal('fund_source'),
-        budget: getVal('budget'),
-        remarks: getVal('remarks'),
-        strategies: typeof selectedStrategies !== 'undefined' ? selectedStrategies.join(", ") : ""
+        unit: getVal('end_user')
     };
+
+    // The Export PDF button only ever appears once a saved PPMP is open in
+    // the modal (see loadRecordIntoModal), so pull every line item that
+    // belongs to it from storage — not just whichever single item happens
+    // to be on screen — so the export matches the real, multi-item PPMP.
+    let items = [];
+    if (typeof currentEditingId !== 'undefined' && currentEditingId && typeof getRecords === 'function') {
+        const record = getRecords().find(r => r.id == currentEditingId);
+        if (record) {
+            items = typeof getRecordItems === 'function' ? getRecordItems(record) : [record];
+        }
+    }
+    if (items.length === 0) {
+        // Fallback (shouldn't normally happen): use whatever is currently
+        // on screen as a single-item PDF.
+        items = [{
+            project_description: getVal('project_description'),
+            project_type: getVal('project_type'),
+            quantity_size: getVal('quantity_size'),
+            mode: getVal('modeOfProcurement'),
+            pre_procurement: getVal('pre_procurement'),
+            start_date: getVal('start_date'),
+            end_date: getVal('end_date'),
+            delivery_period: getVal('delivery_period'),
+            fund_source: getVal('fund_source'),
+            budget: getVal('budget'),
+            strategies: typeof selectedStrategies !== 'undefined' ? selectedStrategies : [],
+            remarks: getVal('remarks')
+        }];
+    }
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 10;
@@ -77,9 +95,10 @@ async function generatePPMP_PDF() {
     doc.text(`End-User or Implementing Unit:  ${data.unit}`, margin, currentY + 5);
 
     // 4. PREPARE TABLE DATA
-    // Clean the budget string (remove commas/spaces) so toLocaleString works
-    const numericBudget = parseFloat(String(data.budget).replace(/[^0-9.]/g, '')) || 0;
-    const formattedBudget = numericBudget.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    // Clean each item's budget string (remove commas/spaces) so toLocaleString works
+    const parseBudget = (raw) => parseFloat(String(raw).replace(/[^0-9.]/g, '')) || 0;
+    const totalBudget = items.reduce((sum, item) => sum + parseBudget(item.budget), 0);
+    const formattedTotal = totalBudget.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
     const headers = [
         [
@@ -104,25 +123,32 @@ async function generatePPMP_PDF() {
         ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5', 'Column 6', 'Column 7', 'Column 8', 'Column 9', 'Column 10', 'Column 11', 'Column 12']
     ];
 
+    const itemRows = items.map(item => {
+        const formattedBudget = parseBudget(item.budget).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+        const strategiesStr = Array.isArray(item.strategies) ? item.strategies.join(", ") : (item.strategies || "");
+
+        return [
+            item.project_description || '',   // Col 1
+            item.project_type || '',          // Col 2
+            item.quantity_size || '',         // Col 3
+            item.mode || '',                  // Col 4
+            item.pre_procurement || '',       // Col 5
+            item.start_date || '',            // Col 6
+            item.end_date || '',              // Col 7
+            item.delivery_period || '',       // Col 8
+            item.fund_source || '',           // Col 9
+            `P ${formattedBudget}`,           // Col 10
+            strategiesStr,                    // Col 11
+            item.remarks || ''                // Col 12
+        ];
+    });
+
     const rows = [
-        [
-            data.project_desc,   // Col 1
-            data.projType,       // Col 2
-            data.quantity_size,  // Col 3
-            data.mode,           // Col 4
-            data.preProc,        // Col 5
-            data.start,          // Col 6
-            data.end,            // Col 7
-            data.delivery,       // Col 8
-            data.source,         // Col 9
-            `P ${formattedBudget}`, // Col 10
-            data.strategies,     // Col 11
-            data.remarks         // Col 12
-        ],
+        ...itemRows,
         // Summary Total Row
         [
             { content: 'TOTAL BUDGET:', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
-            { content: `P ${formattedBudget}`, styles: { fontStyle: 'bold' } },
+            { content: `P ${formattedTotal}`, styles: { fontStyle: 'bold' } },
             '',
             ''
         ]
