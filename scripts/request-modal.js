@@ -2724,6 +2724,17 @@ function enableModalFields() {
 
     document.getElementById('ppmp_no').readOnly = true;
     document.getElementById('fiscal_year').readOnly = true; // <--- ADD THIS LINE
+
+    // End-User/Implementing Unit is always the signed-in office — never
+    // free-typed, so filtering in getRecords() stays an exact match.
+    const endUserField = document.getElementById('end_user');
+    if (endUserField) {
+        const session = typeof getSession === 'function' ? getSession() : null;
+        if (session && session.office) {
+            endUserField.value = session.office;
+        }
+        endUserField.readOnly = true;
+    }
 }
 
 

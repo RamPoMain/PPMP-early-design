@@ -6,7 +6,17 @@
 // ============================================================
 
 function getRecords() {
-    return JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const all = JSON.parse(localStorage.getItem('procurement_records')) || [];
+
+    // Scope every read to the signed-in office so one account never sees
+    // another office's PPMPs/entries. Writes still go straight to
+    // localStorage (see saveProcurementRequest, etc.) against the full,
+    // unfiltered list, so this never risks losing other offices' data.
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.office) return all;
+
+    const office = session.office.trim().toLowerCase();
+    return all.filter(r => (r.end_user || '').trim().toLowerCase() === office);
 }
 
 

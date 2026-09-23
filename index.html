@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="resource/step2.css">
     <link rel="stylesheet" href="resource/step3.css">
     <link rel="stylesheet" href="resource/request-modal.css">
+    <script src="scripts/auth.js"></script>
+    <script>requireAuth();</script>
 </head>
 <body class="db-body">
 
@@ -67,7 +69,7 @@
     <header class="db-topbar">
             <div>
                 <h1 class="db-title">Dashboard</h1>
-                <p class="db-subtitle">Welcome back, Juan </p>
+                <p class="db-subtitle" id="db-subtitle-greeting">Welcome back</p>
             </div>
             <div class="db-topbar-actions">
                 <button id="themeToggle" class="db-icon-btn" aria-label="Toggle dark/light mode" title="Toggle theme">
@@ -83,7 +85,7 @@
 
         <section class="db-welcome-card">
             <div>
-                <h2>Good day, Juan!</h2>
+                <h2 id="db-welcome-heading">Good day!</h2>
                 <p>Here's a quick look at your procurement requests and activity.</p>
             </div>
             <div class="db-welcome-actions">
