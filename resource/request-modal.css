@@ -54,6 +54,18 @@
     background-color: var(--db-card) !important;
 }
 
+.choice-overlay {
+    z-index: 2000;
+}
+
+.choice-tab { 
+    position: static !important; transform: none !important; margin-bottom: 20px !important; pointer-events: auto !important; width: 100% !important; border: 1px solid var(--border) !important; background: var(--bg-card) !important; 
+}
+
+.choice-group { 
+    margin-bottom: 22px !important; 
+}
+
 .choice-modal-content {
     margin-top: 10px !important; /* Adjusted margin to accommodate the floating tab */
 }
