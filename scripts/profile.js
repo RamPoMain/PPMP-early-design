@@ -697,51 +697,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     // --------------------------------------------------------
-    // LOGOUT BUTTON
-    // --------------------------------------------------------
-
-    const logoutButton =
-        document.querySelector(
-            ".logout-btn"
-        );
-
-
-    if (logoutButton) {
-
-        logoutButton.addEventListener(
-            "click",
-            function () {
-
-                const confirmLogout =
-                    confirm(
-                        "Are you sure you want to logout?"
-                    );
-
-
-                if (!confirmLogout) {
-                    return;
-                }
-
-
-                /*
-                 * Keep application data such as
-                 * procurement_records.
-                 *
-                 * Only remove session-related
-                 * information when a real
-                 * authentication system exists.
-                 */
-
-                window.location.href =
-                    "index.html";
-
-            }
-        );
-
-    }
-
-
-    // --------------------------------------------------------
     // CAMERA BUTTON
     // --------------------------------------------------------
 

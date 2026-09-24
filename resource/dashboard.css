@@ -915,3 +915,119 @@ html[data-theme="light"] {
         align-items: flex-start;
     }
 }
+
+/* ============================================================
+   LOGOUT CONFIRMATION MODAL
+   Built by initLogoutLinks() in auth.js. Uses the --db-* theme
+   variables, so it follows the dark/light toggle automatically.
+   ============================================================ */
+
+.logout-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(4, 8, 20, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+.logout-overlay.show {
+    display: flex;
+    animation: logout-fade 0.15s ease;
+}
+
+.logout-modal {
+    width: 100%;
+    max-width: 380px;
+    padding: 30px 28px 24px;
+    text-align: center;
+    background: var(--db-card);
+    color: var(--db-text);
+    border: 1px solid var(--db-border);
+    border-radius: 16px;
+    box-shadow: var(--db-shadow);
+    font-family: 'Inter', 'Roboto', sans-serif;
+    animation: logout-pop 0.18s ease;
+}
+
+.logout-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    color: #F87171;
+}
+
+.logout-modal h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--db-text);
+}
+
+.logout-modal p {
+    margin: 0 0 24px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--db-text-dim);
+}
+
+.logout-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.logout-cancel-btn,
+.logout-confirm-btn {
+    flex: 1;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.logout-cancel-btn {
+    background: transparent;
+    color: var(--db-text);
+    border: 1px solid var(--db-field-border);
+}
+
+.logout-cancel-btn:hover { background: var(--db-card-alt); }
+
+.logout-confirm-btn {
+    background: #DC2626;
+    color: #fff;
+    border: 1px solid #DC2626;
+}
+
+.logout-confirm-btn:hover { background: #B91C1C; border-color: #B91C1C; }
+
+.logout-cancel-btn:active,
+.logout-confirm-btn:active { transform: scale(0.98); }
+
+.logout-cancel-btn:focus-visible,
+.logout-confirm-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--db-accent-soft);
+    border-color: var(--db-accent);
+}
+
+@keyframes logout-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes logout-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}

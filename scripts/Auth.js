@@ -97,21 +97,125 @@ function applySessionToSidebar() {
     if (heading) heading.textContent = 'Good day, ' + session.role + '!';
 }
 
-// Wires every .db-logout link on the page to confirm, clear the
-// session, and send the user back to the login screen.
-function initLogoutLinks() {
-    document.querySelectorAll('.db-logout').forEach(function (link) {
-        link.addEventListener('click', function (e) {
-            e.preventDefault();
-            if (!confirm('Are you sure you want to logout?')) return;
+// ============================================================
+// LOGOUT — custom confirmation modal (replaces the browser confirm())
+//
+// The modal is built on first use and appended to <body>, so no page
+// needs extra markup. Styles live in dashboard.css (.logout-*), which
+// follows the same dark/light theme variables as the rest of the app.
+// ============================================================
 
-            // Keep application data such as procurement_records —
-            // only the session itself is cleared.
-            clearSession();
-            window.location.href = 'login.html';
+let logoutModalEl = null;
+let logoutPrevFocus = null;
+
+function buildLogoutModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'logout-overlay';
+    overlay.id = 'logoutOverlay';
+    overlay.innerHTML =
+        '<div class="logout-modal" role="alertdialog" aria-modal="true" ' +
+            'aria-labelledby="logoutTitle" aria-describedby="logoutDesc">' +
+            '<div class="logout-icon">' +
+                '<svg viewBox="0 0 24 24" width="24" height="24" fill="none">' +
+                    '<path d="M9 20H5.6C5 20 4.5 19.5 4.5 18.9V5.1C4.5 4.5 5 4 5.6 4H9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+                    '<path d="M15.5 16L19.5 12L15.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+                    '<path d="M19.2 12H10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+                '</svg>' +
+            '</div>' +
+            '<h3 id="logoutTitle">Log out?</h3>' +
+            '<p id="logoutDesc">You will need to sign in again to get back to your procurement records.</p>' +
+            '<div class="logout-actions">' +
+                '<button type="button" class="logout-cancel-btn" data-logout-cancel>Cancel</button>' +
+                '<button type="button" class="logout-confirm-btn" data-logout-confirm>Log out</button>' +
+            '</div>' +
+        '</div>';
+
+    // Click on the dimmed backdrop (but not the card) cancels.
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeLogoutModal();
+    });
+    overlay.querySelector('[data-logout-cancel]').addEventListener('click', closeLogoutModal);
+    overlay.querySelector('[data-logout-confirm]').addEventListener('click', performLogout);
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+// Escape closes; Tab is kept inside the two buttons while the modal is open.
+function onLogoutKeydown(e) {
+    if (!logoutModalEl || !logoutModalEl.classList.contains('show')) return;
+
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        closeLogoutModal();
+        return;
+    }
+
+    if (e.key === 'Tab') {
+        const buttons = logoutModalEl.querySelectorAll('button');
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+}
+
+function openLogoutModal() {
+    if (!logoutModalEl) logoutModalEl = buildLogoutModal();
+
+    logoutPrevFocus = document.activeElement;
+    logoutModalEl.classList.add('show');
+    document.addEventListener('keydown', onLogoutKeydown);
+
+    // Default focus on Cancel so a stray Enter press never logs anyone out.
+    logoutModalEl.querySelector('[data-logout-cancel]').focus();
+}
+
+function closeLogoutModal() {
+    if (!logoutModalEl) return;
+    logoutModalEl.classList.remove('show');
+    document.removeEventListener('keydown', onLogoutKeydown);
+    if (logoutPrevFocus && typeof logoutPrevFocus.focus === 'function') {
+        logoutPrevFocus.focus();
+    }
+}
+
+function performLogout() {
+    // Keep application data such as procurement_records —
+    // only the session itself is cleared.
+    clearSession();
+
+    // replace() (not href) so the Back button can't return to a
+    // protected page after logging out.
+    window.location.replace('login.html');
+}
+
+// Wires every logout trigger on the page to the confirmation modal.
+// Triggers: the sidebar .db-logout link, or any element with a
+// data-logout attribute (used by the Logout button on profile.html).
+function initLogoutLinks() {
+    document.querySelectorAll('.db-logout, [data-logout]').forEach(function (el) {
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            openLogoutModal();
         });
     });
 }
+
+// If a protected page is restored from the browser's back/forward cache
+// after logging out, the head script (requireAuth) doesn't run again —
+// re-check here so the old page can't be viewed while signed out.
+window.addEventListener('pageshow', function (e) {
+    const onLoginPage = /login(\.html)?$/i.test(window.location.pathname);
+    if (e.persisted && !onLoginPage && !getSession()) {
+        window.location.replace('login.html');
+    }
+});
 
 document.addEventListener('DOMContentLoaded', function () {
     applySessionToSidebar();
