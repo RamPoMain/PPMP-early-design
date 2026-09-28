@@ -11,25 +11,55 @@
 
 const ACCOUNTS = [
     {
+        email: 'ILCDB@dict.gov.ph',
+        password: 'ILCDB123',
+        role: 'ILCDB',
+        roleName: 'ILCDB',
+        office: 'ICT Literacy Competency and Development Bureu'
+    },
+    {
+        email: 'FPIAP@dict.gov.ph',
+        password: 'FPIAP123',
+        role: 'FPIAP',
+        roleName: 'FPIAP',
+        office: 'Free Public Internet Access Program'
+    },
+    // Head accounts are the first approvers to be followed by TOD
+    {
+        email: 'FPIAPHEAD@dict.gov.ph',
+        password: 'FPIAPH123',
+        role: 'FPIAPH',
+        roleName: 'FPIAP Head',
+        office: 'Head of Free Public Internet Access Program',
+        canApprove: true
+    },
+    {
+        email: 'ILCDBHEAD@dict.gov.ph',
+        password: 'ILCDBH123',
+        role: 'ILCDBH',
+        roleName: 'ILCDB Head',
+        office: 'Head of ICT Literacy Competency and Development Bureu',
+        canApprove: true
+    },
+
+    //Next is the TOD, who is the second approver after the heads of the offices
+    {
         email: 'tod@dict.gov.ph',
         password: 'tod123',
         role: 'TOD',
         roleName: 'Technical Operations Division',
-        office: 'Technical Operations Division'
+        office: 'Technical Operations Division',
+        canApprove: true
     },
+
+    //Third is the Budget Officer
     {
-        email: 'aafd@dict.gov.ph',
-        password: 'aafd123',
-        role: 'AAFD',
-        roleName: 'Administrative and Finance Division',
-        office: 'Administrative and Finance Division'
-    },
-    {
-        email: 'test@dict.gov.ph',
-        password: 'test123',
-        role: 'POP',
-        roleName: 'POP (Test Account)',
-        office: 'POP Test Office'
+        email: 'BudgetOfficer@dict.gov.ph',
+        password: 'Budget123',
+        role: 'BO',
+        roleName: 'Budget Officer',
+        office: 'Budget Office',
+        canApprove: true
     },
     {
         // Authorized approver. `canApprove` is what unlocks the "Approve
@@ -42,7 +72,14 @@ const ACCOUNTS = [
         role: 'RD',
         roleName: 'Regional Director',
         canApprove: true
-    }
+    },
+    {
+        email: 'test@dict.gov.ph',
+        password: 'test123',
+        role: 'POP',
+        roleName: 'POP (Test Account)',
+        office: 'POP Test Office'
+    },
 ];
 
 // Looks up an account by email + password (case-insensitive email).
