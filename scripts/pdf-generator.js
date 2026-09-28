@@ -1,10 +1,24 @@
 async function generatePPMP_PDF() {
+    // The PDF libraries load from a CDN; if they didn't (offline, blocked,
+    // or a page that forgot the <script> tags), say so instead of failing silently.
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        const msg = 'The PDF library could not be loaded. Check your internet connection and reload the page.';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
     });
+
+    if (typeof doc.autoTable !== 'function') {
+        const msg = 'The PDF table plugin could not be loaded. Check your internet connection and reload the page.';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
 
     // 1. COLLECT DATA (Safely)
     const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : "N/A";
