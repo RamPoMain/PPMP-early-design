@@ -21,9 +21,11 @@ async function generatePPMP_PDF() {
     // belongs to it from storage — not just whichever single item happens
     // to be on screen — so the export matches the real, multi-item PPMP.
     let items = [];
+    let approvedRecord = null;
     if (typeof currentEditingId !== 'undefined' && currentEditingId && typeof getRecords === 'function') {
         const record = getRecords().find(r => r.id == currentEditingId);
         if (record) {
+            approvedRecord = record;
             items = typeof getRecordItems === 'function' ? getRecordItems(record) : [record];
         }
     }
@@ -200,6 +202,12 @@ async function generatePPMP_PDF() {
     doc.setFont("helvetica", "normal");
     doc.text("Signature over Printed Name", pageWidth - 35, finalY + 18, { align: "center" });
     doc.text("Regional Director, DICT X", pageWidth - 35, finalY + 22, { align: "center" });
+    if (approvedRecord && approvedRecord.status === 'Completed' && approvedRecord.approved_by) {
+        const approvedOn = approvedRecord.approved_at
+            ? ' on ' + new Date(Number(approvedRecord.approved_at)).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+            : '';
+        doc.text('Approved in system by ' + approvedRecord.approved_by.name + approvedOn, pageWidth - 35, finalY + 26, { align: "center" });
+    }
 
     // Bottom Left: Endorsed By
     const endorseY = finalY + 45;

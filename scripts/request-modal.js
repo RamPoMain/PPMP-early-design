@@ -687,6 +687,7 @@ function saveProcurementRequest() {
 
             status: existingRecord.status,
             approved_at: existingRecord.approved_at,
+            approved_by: existingRecord.approved_by,
             date: existingRecord.date
         };
     } else {
@@ -2371,6 +2372,7 @@ function resetRequestForm() {
 
     const statusBadge = document.getElementById('modalStatusBadge');
     if (statusBadge) statusBadge.classList.add('hidden');
+    hideApprovalInfo();
 
     const pdfButtons = document.querySelectorAll('.pdf-btn-global');
     pdfButtons.forEach(btn => btn.style.display = 'none');
@@ -2582,23 +2584,11 @@ function loadRecordIntoModal(id, itemIndex = 0) {
     // Disable all inputs so it's "Read Only"
     disableModalFields();
 
-    // Status badge + verify/undo control
-    updateStatusBadge(data.status);
-    updateVerifyButtonLabel(data.status);
-
+    // Status badge, approval banner, and which action buttons apply.
+    // A closed (approved) PPMP is read-only: no Edit, no Delete Item.
     const statusBadge = document.getElementById('modalStatusBadge');
     if (statusBadge) statusBadge.classList.remove('hidden');
-
-    const verifyBtn = document.getElementById('verifyRequestBtn');
-    if (verifyBtn) verifyBtn.classList.remove('hidden');
-
-    // Offer a way out of read-only mode
-    const editBtn = document.getElementById('editRequestBtn');
-    if (editBtn) editBtn.classList.remove('hidden');
-
-    // Let the user remove just this line item (rather than the whole PPMP)
-    const deleteItemBtn = document.getElementById('deleteItemBtn');
-    if (deleteItemBtn) deleteItemBtn.classList.remove('hidden');
+    applyApprovalState(data);
 
     renderItemNavigator(data.id, items, safeIndex);
 }
@@ -2614,57 +2604,243 @@ function updateStatusBadge(status) {
     badge.classList.toggle('is-pending', !isCompleted);
 }
 
-// Keeps the verify button's label/color in sync with the current status:
-// "Mark as Completed" when pending, "Mark as Pending" once completed.
-function updateVerifyButtonLabel(status) {
+// ============================================================
+// PPMP APPROVAL
+// Only an account flagged canApprove (see auth.js) can approve.
+// Approving turns the PPMP Final, marks it Completed (closed), and
+// records who approved it and when. A closed PPMP is read-only:
+// no edits, no new items, no item deletion.
+// ============================================================
+
+function isCurrentPpmpClosed() {
+    if (!currentEditingId) return false;
+    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const record = db.find(r => r.id == currentEditingId);
+    return !!record && record.status === 'Completed';
+}
+
+// The header button is now the "Approve PPMP" action. Its id and the
+// toggleVerifyStatus() onclick name are unchanged so the page markup
+// keeps working without edits.
+function updateVerifyButtonLabel() {
     const verifyBtn = document.getElementById('verifyRequestBtn');
     const label = document.getElementById('verifyBtnLabel');
     if (!verifyBtn || !label) return;
 
-    const isCompleted = status === 'Completed';
-    label.textContent = isCompleted ? 'Mark as Pending' : 'Mark as Completed';
-    verifyBtn.classList.toggle('is-completed', isCompleted);
+    label.textContent = 'Approve PPMP';
+    verifyBtn.classList.remove('is-completed');
+    verifyBtn.setAttribute('aria-label', 'Approve this PPMP');
 }
 
-// Flips a viewed record between Pending and Completed directly from the
-// modal, without needing to go through Edit — this is the "verify" action.
+// Shows/hides the modal controls for a record in view mode.
+function applyApprovalState(record) {
+    const isClosed = !!record && record.status === 'Completed';
+    const canApprove = typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
+
+    updateStatusBadge(record.status);
+    updateVerifyButtonLabel();
+    renderApprovalInfo(record);
+
+    const verifyBtn = document.getElementById('verifyRequestBtn');
+    if (verifyBtn) verifyBtn.classList.toggle('hidden', isClosed || !canApprove);
+
+    const editBtn = document.getElementById('editRequestBtn');
+    if (editBtn) editBtn.classList.toggle('hidden', isClosed);
+
+    const deleteItemBtn = document.getElementById('deleteItemBtn');
+    if (deleteItemBtn) deleteItemBtn.classList.toggle('hidden', isClosed);
+}
+
+// Green banner near the top of the modal: who approved and when.
+function renderApprovalInfo(record) {
+    let box = document.getElementById('approvalInfo');
+
+    if (!record || record.status !== 'Completed') {
+        if (box) box.classList.add('hidden');
+        return;
+    }
+
+    if (!box) {
+        const anchor = document.querySelector('#requestModalOverlay .progress-section');
+        if (!anchor || !anchor.parentNode) return;
+        box = document.createElement('div');
+        box.id = 'approvalInfo';
+        box.className = 'approval-info';
+        anchor.parentNode.insertBefore(box, anchor);
+    }
+
+    box.innerHTML = '';
+    const title = document.createElement('strong');
+    const detail = document.createElement('span');
+
+    if (record.approved_by) {
+        const when = typeof formatApprovalDateTime === 'function'
+            ? formatApprovalDateTime(record.approved_at)
+            : '';
+        title.textContent = 'Approved by ' + record.approved_by.name;
+        detail.textContent = [record.approved_by.email, when].filter(Boolean).join(' · ');
+    } else {
+        title.textContent = 'Approved';
+        detail.textContent = 'The approver was not recorded for this PPMP.';
+    }
+
+    box.appendChild(title);
+    box.appendChild(detail);
+    box.classList.remove('hidden');
+}
+
+function hideApprovalInfo() {
+    const box = document.getElementById('approvalInfo');
+    if (box) box.classList.add('hidden');
+}
+
+// ---- Approval confirmation dialog (custom, no browser confirm) ----
+
+let approvalDialogEl = null;
+let approvalPrevFocus = null;
+
+function buildApprovalDialog() {
+    const overlay = document.createElement('div');
+    overlay.className = 'logout-overlay';
+    overlay.id = 'approvalOverlay';
+    overlay.innerHTML =
+        '<div class="logout-modal" role="alertdialog" aria-modal="true" ' +
+            'aria-labelledby="approvalTitle" aria-describedby="approvalDesc">' +
+            '<div class="logout-icon is-approve">' +
+                '<svg viewBox="0 0 24 24" width="24" height="24" fill="none">' +
+                    '<path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+                '</svg>' +
+            '</div>' +
+            '<h3 id="approvalTitle"></h3>' +
+            '<p id="approvalDesc"></p>' +
+            '<div class="logout-actions">' +
+                '<button type="button" class="logout-cancel-btn" data-approval-cancel>Cancel</button>' +
+                '<button type="button" class="logout-confirm-btn is-approve" data-approval-confirm>Approve</button>' +
+            '</div>' +
+        '</div>';
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeApprovalDialog();
+    });
+    overlay.querySelector('[data-approval-cancel]').addEventListener('click', closeApprovalDialog);
+    overlay.querySelector('[data-approval-confirm]').addEventListener('click', approveCurrentPpmp);
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+// Runs in the capture phase so Escape closes only this dialog, not the
+// request modal underneath it.
+function onApprovalKeydown(e) {
+    if (!approvalDialogEl || !approvalDialogEl.classList.contains('show')) return;
+
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeApprovalDialog();
+        return;
+    }
+
+    if (e.key === 'Tab') {
+        const buttons = approvalDialogEl.querySelectorAll('button');
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+}
+
+// Called by the header button (name kept from the old verify toggle).
 function toggleVerifyStatus() {
+    openApprovalDialog();
+}
+
+function openApprovalDialog() {
+    if (!currentEditingId) return;
+
+    if (typeof canCurrentUserApprove !== 'function' || !canCurrentUserApprove()) {
+        showToast('Only an authorized approver can approve a PPMP.');
+        return;
+    }
+    if (isCurrentPpmpClosed()) return;
+
+    if (!approvalDialogEl) approvalDialogEl = buildApprovalDialog();
+
+    const ppmpNo = (document.getElementById('ppmp_no') || {}).value || '';
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const who = session && session.roleName ? session.roleName : 'you';
+
+    document.getElementById('approvalTitle').textContent = 'Approve PPMP No. ' + ppmpNo + '?';
+    document.getElementById('approvalDesc').textContent =
+        'This marks the PPMP as Final and closes it. It can no longer be edited, get new items, ' +
+        'or be deleted by the requesting office. The approval will be recorded under ' + who + '.';
+
+    approvalPrevFocus = document.activeElement;
+    approvalDialogEl.classList.add('show');
+    document.addEventListener('keydown', onApprovalKeydown, true);
+
+    // Default focus on Cancel so a stray Enter never approves anything.
+    approvalDialogEl.querySelector('[data-approval-cancel]').focus();
+}
+
+function closeApprovalDialog() {
+    if (!approvalDialogEl) return;
+    approvalDialogEl.classList.remove('show');
+    document.removeEventListener('keydown', onApprovalKeydown, true);
+    if (approvalPrevFocus && typeof approvalPrevFocus.focus === 'function') {
+        approvalPrevFocus.focus();
+    }
+}
+
+function approveCurrentPpmp() {
+    closeApprovalDialog();
+
+    // Re-check here as well — hiding the button is not the only gate.
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canApprove) {
+        showToast('Only an authorized approver can approve a PPMP.');
+        return;
+    }
     if (!currentEditingId) return;
 
     const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
     const idx = db.findIndex(r => r.id == currentEditingId);
     if (idx === -1) return;
+    if (db[idx].status === 'Completed') return;
 
-    const nextStatus = db[idx].status === 'Completed' ? 'Pending' : 'Completed';
-    db[idx].status = nextStatus;
-    if (nextStatus === 'Completed') {
-        db[idx].approved_at = Date.now();
-    } else {
-        delete db[idx].approved_at;
-    }
+    db[idx].status = 'Completed';
+    db[idx].is_indicative = 'Final';
+    db[idx].approved_at = Date.now();
+    db[idx].approved_by = {
+        name: session.roleName,
+        role: session.role,
+        email: session.email
+    };
 
     try {
         localStorage.setItem('procurement_records', JSON.stringify(db));
     } catch (err) {
-        showToast('Could not update the status — please try again.');
+        showToast('Could not save the approval — please try again.');
         return;
     }
 
-    // Reflect the change immediately in the still-open modal
-    updateStatusBadge(nextStatus);
-    updateVerifyButtonLabel(nextStatus);
+    // Reflect the change in the still-open modal
+    const indicativeField = document.getElementById('is_indicative');
+    if (indicativeField) indicativeField.value = 'Final';
+    applyApprovalState(db[idx]);
 
     // Refresh the dashboard behind the modal (stat cards, activity feed,
-    // notification dot) so it doesn't go stale until the modal is closed
+    // entries table, notification dot)
     if (typeof refreshDashboardRecords === 'function') {
         refreshDashboardRecords();
     }
 
-    showToast(
-        nextStatus === 'Completed'
-            ? 'Request verified and marked as completed.'
-            : 'Request reverted to pending.'
-    );
+    showToast('PPMP No. ' + db[idx].ppmp_no + ' approved and marked Final.');
 }
 
 // Deletes just the item currently shown in the modal, rather than the
@@ -2679,6 +2855,11 @@ function deleteCurrentItem() {
 }
 
 function enableEditMode() {
+    if (isCurrentPpmpClosed()) {
+        showToast('This PPMP is approved and closed — it can no longer be edited.');
+        return;
+    }
+
     isViewMode = false;
     enableModalFields();
     hideItemNavigator();

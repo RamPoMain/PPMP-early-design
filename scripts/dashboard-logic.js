@@ -71,6 +71,50 @@ function escapeHtml(value) {
 // one it's looking at.
 // ============================================================
 
+// ------------------------------------------------------------
+// PPMP approval helpers
+// A PPMP is "closed" once it is approved (status === 'Completed').
+// approved_by = { name, role, email }, approved_at = timestamp (ms).
+// ------------------------------------------------------------
+function isPpmpClosed(record) {
+    return !!record && record.status === 'Completed';
+}
+
+// Approved PPMPs can only be deleted by an approver.
+function canDeleteRecord(record) {
+    if (!isPpmpClosed(record)) return true;
+    return typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
+}
+
+function formatApprovalDate(timestamp) {
+    const n = Number(timestamp);
+    if (!n) return '';
+    return new Date(n).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatApprovalDateTime(timestamp) {
+    const n = Number(timestamp);
+    if (!n) return '';
+    return new Date(n).toLocaleString('en-PH', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit'
+    });
+}
+
+// "Approved By" cell for the Entries table.
+function renderApprovedByCell(record) {
+    if (!isPpmpClosed(record)) {
+        return '<span class="db-approver-none">—</span>';
+    }
+    const by = record.approved_by;
+    if (!by) {
+        return '<span class="db-approver-none" title="This PPMP was completed before approver tracking existed">Not recorded</span>';
+    }
+    return '<div class="db-approver"><strong>' + escapeHtml(by.name) + '</strong><span>' +
+        escapeHtml(formatApprovalDate(record.approved_at)) + '</span></div>';
+}
+
+
 function getRecordItems(record) {
     if (!record) return [];
 
@@ -224,7 +268,7 @@ function renderActivity(records) {
                     <span class="db-activity-icon ${icon.className}">${icon.svg}</span>
                     <div>
                         <p class="db-activity-text" title="${safeLabel}">${safeLabel}</p>
-                        <span class="db-activity-time">${time}</span>
+                        <span class="db-activity-time">${time}${isPpmpClosed(record) && record.approved_by ? ' · Approved by ' + escapeHtml(record.approved_by.name) : ''}</span>
                     </div>
                 </div>
                 
@@ -240,9 +284,9 @@ function renderActivity(records) {
                     </button>
                     
                     <!-- DELETE BUTTON -->
-                    <button class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
+                    ${canDeleteRecord(record) ? `<button class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    </button>
+                    </button>` : ''}
                 </div>
             </li>
         `;
@@ -368,6 +412,7 @@ function buildExcelPreviewMarkup(record) {
                     <strong>SITTIE RAHMA V. ALAWI, MTM, CSSGB</strong>
                     <small>Signature over Printed Name</small>
                     <small>Regional Director, DICT X</small>
+                    ${isPpmpClosed(record) && record.approved_by ? `<small>Approved in system by ${escapeHtml(record.approved_by.name)}${record.approved_at ? ' on ' + escapeHtml(formatApprovalDate(record.approved_at)) : ''}</small>` : ''}
                 </div>
                 <div>
                     <p>Endorsed by:</p>
@@ -521,6 +566,7 @@ function renderEntries(records) {
                 <td>${escapeHtml(budget)}</td>
                 <td><span class="db-status-pill ${status === 'Completed' ? 'is-completed' : 'is-pending'}">${status}</span></td>
                 <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
+                <td>${renderApprovedByCell(record)}</td>
                 <td>
                     <div class="db-entry-actions">
                         ${status === 'Pending' ? `
@@ -534,9 +580,9 @@ function renderEntries(records) {
                         <button class="db-action-btn" title="View Details" onclick="openEntryRecord(${recordId})">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
-                        <button class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
+                        ${canDeleteRecord(record) ? `<button class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                        </button>
+                        </button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -621,6 +667,12 @@ function setConfirmModalText(title, message) {
 
 // 1. Function called when clicking the trash icon on a whole PPMP row
 function deleteRecord(id) {
+    const target = getRecords().find(r => r.id == id);
+    if (target && !canDeleteRecord(target)) {
+        showToast('An approved PPMP is closed and can only be deleted by an approver.');
+        return;
+    }
+
     pendingDelete = { type: 'record', id: id };
     setConfirmModalText(
         'Delete Request?',
@@ -642,6 +694,10 @@ function deleteRecordItem(recordId, itemId) {
 
     const records = getRecords();
     const record = records.find(r => r.id == recordId);
+    if (isPpmpClosed(record)) {
+        showToast('This PPMP is approved and closed — its items can no longer be deleted.');
+        return;
+    }
     const items = record && typeof getRecordItems === 'function' ? getRecordItems(record) : [];
     const isOnlyItem = items.length <= 1;
 

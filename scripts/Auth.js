@@ -1,7 +1,7 @@
 // ============================================================
 // DICT PROCUREMENT — AUTH (client-side only, no backend yet)
 //
-// Three hardcoded office accounts. Each account's `office` string
+// Hardcoded accounts (three offices plus one approver). Each office account's `office` string
 // must exactly match the "End-User or Implementing Unit" value
 // stored on a PPMP record — getRecords() in dashboard-logic.js
 // filters on it, and enableModalFields() in request-modal.js
@@ -30,6 +30,18 @@ const ACCOUNTS = [
         role: 'POP',
         roleName: 'POP (Test Account)',
         office: 'POP Test Office'
+    },
+    {
+        // Authorized approver. `canApprove` is what unlocks the "Approve
+        // PPMP" action. There is deliberately no `office`: getRecords() in
+        // dashboard-logic.js only filters by office when the session has
+        // one, so this account sees every office's PPMPs. To authorize
+        // another account, just add `canApprove: true` to it.
+        email: 'rd@dict.gov.ph',
+        password: 'rd123',
+        role: 'RD',
+        roleName: 'Regional Director',
+        canApprove: true
     }
 ];
 
@@ -54,8 +66,17 @@ function setSession(account) {
         email: account.email,
         role: account.role,
         roleName: account.roleName,
-        office: account.office
+        office: account.office,
+        canApprove: !!account.canApprove
     }));
+}
+
+// True when the signed-in account is allowed to approve PPMPs.
+// (Client-side only, like the rest of auth — fine for the prototype,
+// but this must be enforced by the backend once there is one.)
+function canCurrentUserApprove() {
+    const session = getSession();
+    return !!(session && session.canApprove);
 }
 
 function clearSession() {
