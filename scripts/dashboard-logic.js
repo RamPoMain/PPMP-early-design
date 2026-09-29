@@ -5,28 +5,35 @@
 // - Dark / light theme toggle (persisted)
 // ============================================================
 
+
+function getSessionUser() {
+    // Look for the 'currentUser' key set during login
+    return JSON.parse(localStorage.getItem('currentUser')) || { role: 'ILCDB', canApprove: false };
+}
+
 function getRecords() {
-    const all = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    // 1. Get all raw data
+    const allRecords = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    
+    // 2. Get current user session
+    const user = getSessionUser(); // Function we added to request-modal.js or define it here
 
-    // Scope every read to the signed-in office so one account never sees
-    // another office's PPMPs/entries. Writes still go straight to
-    // localStorage (see saveProcurementRequest, etc.) against the full,
-    // unfiltered list, so this never risks losing other offices' data.
-    const session = typeof getSession === 'function' ? getSession() : null;
-    if (!session) return all;
+    // 3. Filter the records based on the Approval Workflow
+    const visibleRecords = allRecords.filter(req => {
+        // Condition A: If I am the creator (ILCDB/FPIAP), I see my own requests always
+        if (user.role === 'ILCDB' || user.role === 'FPIAP') return true;
 
-    const office = (session.office || '').trim().toLowerCase();
-    const isOwnOffice = r => !!office && (r.end_user || '').trim().toLowerCase() === office;
+        // Condition B: If I am the current required approver, I see it
+        if (user.canApprove && req.currentApproverRole === user.role) return true;
 
-    // Approvers see every office's PPMPs once they are submitted (For
-    // Approval) or approved (Completed) — never other offices' Drafts —
-    // plus anything belonging to their own office.
-    if (session.canApprove) {
-        return all.filter(r => getPpmpStatus(r) !== 'Draft' || isOwnOffice(r));
-    }
+        // Condition C: If the project is fully Approved, everyone can see it for transparency
+        if (req.status === 'Completed' || req.status === 'Approved') return true;
 
-    if (!office) return all;
-    return all.filter(isOwnOffice);
+        return false;
+    });
+
+    // THE FIX: You must return the filtered list so the dashboard uses it!
+    return visibleRecords;
 }
 
 
@@ -1161,26 +1168,6 @@ function renderEntries(records) {
     }).join('');
 }
 
-
-function refreshDashboardRecords() {
-    const records = getRecords();
-
-    renderStats(records);
-    renderActivity(records);
-    renderEntries(records);
-
-    const notifDot = document.getElementById('notifDot');
-
-    if (notifDot) {
-        const approver = typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
-        const pendingCount = records.filter(r => approver
-            ? getPpmpStatus(r) === 'For Approval'
-            : getPpmpStatus(r) !== 'Completed').length;
-        notifDot.classList.toggle('hidden', pendingCount === 0);
-    }
-}
-
-
 function initEntryFilters() {
     ['entryStatusFilter', 'entryIndicativeFilter', 'entryTypeFilter', 'entrySearchInput'].forEach(id => {
         const control = document.getElementById(id);
@@ -1296,6 +1283,25 @@ function closeConfirmModal() {
     pendingDelete = null;
 }
 
+// This gathers the rendering logic so it can be called from the modal
+function refreshDashboardRecords() {
+    const records = getRecords(); // This uses the filtered logic from our previous step
+
+    // Update the Summary Cards
+    renderStats(records);
+
+    // Update the Activity List
+    renderActivity(records);
+
+    // Update the Notification Dot
+    const notifDot = document.getElementById('notifDot');
+    if (notifDot) {
+        // Show dot if there are any requests waiting for the current user's approval
+        const pendingCount = records.filter(r => r.status.includes('Pending')).length;
+        notifDot.classList.toggle('hidden', pendingCount === 0);
+    }
+}
+
 // 3. Event Listener for the actual "Delete" button inside the popup
 document.addEventListener('DOMContentLoaded', function() {
     const confirmBtn = document.getElementById('confirmDeleteBtn');
@@ -1400,7 +1406,6 @@ function initThemeToggle() {
         localStorage.setItem('dashboard_theme', nextTheme);
     });
 }
-
 
 document.addEventListener('DOMContentLoaded', function () {
 
