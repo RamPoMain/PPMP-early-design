@@ -113,16 +113,9 @@ function findAccount(email, password) {
     }) || null;
 }
 
-function getSession() {
-    try {
-        return JSON.parse(localStorage.getItem('dashboard_session'));
-    } catch (e) {
-        return null;
-    }
-}
-
-function setSession(account) {
-    localStorage.setItem('dashboard_session', JSON.stringify({
+// Builds the session object from an account definition.
+function buildSession(account) {
+    return {
         id: account.email.toLowerCase(),
         email: account.email,
         role: account.role,
@@ -132,7 +125,32 @@ function setSession(account) {
         canRequest: !!account.canRequest,
         stage: account.stage || null,
         headOf: account.headOf || null
-    }));
+    };
+}
+
+// Reads the signed-in user. Only the email is trusted from storage: the
+// permissions (stage, canApprove, canRequest, office...) are re-read from
+// ACCOUNTS every time, so
+//   - a login saved before Auth.js was updated picks up new fields
+//     automatically (no need to log out and back in), and
+//   - editing dashboard_session in devtools can't grant approval rights.
+// If the account no longer exists, the user is treated as signed out.
+function getSession() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('dashboard_session'));
+        if (!saved || !saved.email) return null;
+        const email = String(saved.email).toLowerCase();
+        const account = ACCOUNTS.find(function (acct) {
+            return acct.email.toLowerCase() === email;
+        });
+        return account ? buildSession(account) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setSession(account) {
+    localStorage.setItem('dashboard_session', JSON.stringify(buildSession(account)));
 }
 
 // True when the signed-in account is allowed to approve PPMPs.

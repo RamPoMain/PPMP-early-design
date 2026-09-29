@@ -1381,3 +1381,118 @@ textarea.ep-input {
 }
 
 .ep-submit-btn:hover { background: var(--db-accent-soft); }
+
+/* ============================================================
+   PPMP REVIEW — approve / reject / remarks
+   Dialog (built in request-modal.js) reuses the .logout-* shell.
+   ============================================================ */
+
+.logout-modal.review-modal { max-width: 460px; }
+.review-modal .logout-icon { margin-left: auto; margin-right: auto; }
+.review-modal h3,
+.review-modal > p { text-align: center; }
+.review-modal > p { margin-bottom: 16px; }
+
+.review-field { margin: 0 0 18px; text-align: left; }
+.review-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--db-text-dim);
+}
+.review-field textarea {
+    width: 100%;
+    min-height: 96px;
+    resize: vertical;
+    padding: 11px 13px;
+    border-radius: 9px;
+    border: 1px solid var(--db-field-border);
+    background: var(--db-card-alt);
+    color: var(--db-text);
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+.review-field textarea::placeholder { color: var(--db-text-faint); }
+.review-field textarea:focus {
+    outline: none;
+    border-color: var(--db-accent);
+    box-shadow: 0 0 0 3px var(--db-accent-soft);
+}
+.review-field.has-error textarea { border-color: #DC2626; }
+.review-error { display: none; margin: 6px 0 0; font-size: 12px; color: #F87171; }
+.review-field.has-error .review-error { display: block; }
+html[data-theme="light"] .review-error { color: #B91C1C; }
+
+.review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.logout-confirm-btn.is-reject { background: #DC2626; border-color: #DC2626; }
+.logout-confirm-btn.is-reject:hover { background: #B91C1C; border-color: #B91C1C; }
+
+/* Review history inside the request modal */
+.review-remarks { display: flex; flex-direction: column; gap: 12px; margin: 0 0 18px; }
+.review-remarks.hidden { display: none !important; }
+
+.review-returned {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.30);
+}
+.review-returned strong { font-size: 13px; color: #F87171; }
+.review-returned span { font-size: 12.5px; line-height: 1.5; color: var(--db-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-returned small { font-size: 11.5px; color: var(--db-text-dim); }
+html[data-theme="light"] .review-returned strong { color: #B91C1C; }
+
+.review-history-title {
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--db-text-dim);
+}
+.review-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.review-item {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--db-card-alt);
+    border: 1px solid var(--db-border);
+}
+.review-item-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--db-text-dim);
+}
+.review-item-head strong { font-size: 12.5px; color: var(--db-text); }
+.review-item-text { margin: 0; font-size: 13px; line-height: 1.5; color: var(--db-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.review-tag { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+.review-tag.is-approved  { background: var(--db-green-soft); color: var(--db-green); }
+.review-tag.is-rejected  { background: rgba(239, 68, 68, 0.14); color: #F87171; }
+.review-tag.is-remark    { background: var(--db-accent-soft); color: var(--db-accent); }
+.review-tag.is-submitted { background: rgba(148, 163, 184, 0.16); color: var(--db-text-dim); }
+html[data-theme="light"] .review-tag.is-rejected { color: #B91C1C; }
+
+/* "Returned" status (a rejected PPMP, editable again) */
+.db-status-pill.is-returned,
+.modal-status-badge.is-returned { background: rgba(239, 68, 68, 0.14); color: #F87171; }
+html[data-theme="light"] .db-status-pill.is-returned,
+html[data-theme="light"] .modal-status-badge.is-returned { color: #B91C1C; }

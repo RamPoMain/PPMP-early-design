@@ -1168,7 +1168,9 @@ function getRecommendedMode(budgetNumber) {
 }
 
 
-function formatPesoExact(amount) {
+// Named differently from formatPesoExact() in dashboard-logic.js, which formats
+// table/preview totals ('P 1,234.50'). This one is only for the validation message.
+function formatPesoMessage(amount) {
 
     return '₱' +
         amount.toLocaleString('en-PH', {
@@ -1218,7 +1220,7 @@ function validateModeBudgetMatch() {
     if (modeValue !== recommended.mode) {
 
         const message =
-            `Budget of ${formatPesoExact(budgetNumber)} falls in the ${recommended.label} bracket, ` +
+            `Budget of ${formatPesoMessage(budgetNumber)} falls in the ${recommended.label} bracket, ` +
             `which requires "${recommended.mode}". Please change the Mode of ` +
             `Procurement or adjust the Estimated Budget so they match.`;
 
@@ -2321,6 +2323,7 @@ function initFileUpload() {
 // ============================================================
 
 function resetRequestForm() {
+    if (typeof hideReviewRemarks === 'function') hideReviewRemarks();
 
     // Clear which item (if any) we were viewing/editing within a PPMP —
     // a fresh form always starts as "brand-new PPMP, first item".
@@ -2612,16 +2615,13 @@ function loadRecordIntoModal(id, itemIndex = 0) {
     const session = typeof getSession === 'function' ? getSession() : null;
     const finishBtn = document.getElementById('finishBtn');
 
+    finishBtn.style.background = '';
     if (canSessionActOnRecord(data)) {
         document.getElementById('page-title').innerText = "APPROVAL REQUIRED: " + data.ppmp_no;
-    
-        const remarksField = document.getElementById('remarks');
-        remarksField.disabled = false;
-        remarksField.style.background = "var(--db-card-alt, #0F172A)";
 
-        finishBtn.innerText = "Approve & Forward \u2192";
-        finishBtn.style.background = "var(--db-green, #22C55E)";
-        finishBtn.onclick = () => approveWorkflowStep();
+        finishBtn.innerText = "Review & Decide \u2192";
+        finishBtn.style.background = "var(--db-accent, #3B82F6)";
+        finishBtn.onclick = () => openApprovalDialog();
     }
 
     // Status badge, approval banner, and which action buttons apply.
@@ -2675,9 +2675,9 @@ function updateVerifyButtonLabel() {
     const label = document.getElementById('verifyBtnLabel');
     if (!verifyBtn || !label) return;
 
-    label.textContent = 'Approve PPMP';
+    label.textContent = 'Review PPMP';
     verifyBtn.classList.remove('is-completed');
-    verifyBtn.setAttribute('aria-label', 'Approve this PPMP');
+    verifyBtn.setAttribute('aria-label', 'Review this PPMP: approve, reject or add remarks');
 }
 
 // Shows/hides the modal controls for a record in view mode.
@@ -2687,8 +2687,10 @@ function applyApprovalState(record) {
     const canApprove = typeof canSessionActOnRecord === 'function' && canSessionActOnRecord(record);
 
     updateStatusBadge(record.status);
+    applyReturnedBadge(record);
     updateVerifyButtonLabel();
     renderApprovalInfo(record);
+    renderReviewRemarks(record);
 
     const verifyBtn = document.getElementById('verifyRequestBtn');
     if (verifyBtn) verifyBtn.classList.toggle('hidden', status !== 'For Approval' || !canApprove);
@@ -2753,7 +2755,7 @@ function buildApprovalDialog() {
     overlay.className = 'logout-overlay';
     overlay.id = 'approvalOverlay';
     overlay.innerHTML =
-        '<div class="logout-modal" role="alertdialog" aria-modal="true" ' +
+        '<div class="logout-modal review-modal" role="alertdialog" aria-modal="true" ' +
             'aria-labelledby="approvalTitle" aria-describedby="approvalDesc">' +
             '<div class="logout-icon is-approve">' +
                 '<svg viewBox="0 0 24 24" width="24" height="24" fill="none">' +
@@ -2762,17 +2764,30 @@ function buildApprovalDialog() {
             '</div>' +
             '<h3 id="approvalTitle"></h3>' +
             '<p id="approvalDesc"></p>' +
-            '<div class="logout-actions">' +
-                '<button type="button" class="logout-cancel-btn" data-approval-cancel>Cancel</button>' +
-                '<button type="button" class="logout-confirm-btn is-approve" data-approval-confirm>Approve</button>' +
+            '<div class="review-field" id="approvalRemarksField">' +
+                '<label for="approvalRemarks">Remarks</label>' +
+                '<textarea id="approvalRemarks" maxlength="1000" ' +
+                    'placeholder="Point out errors, ask for clarification, or leave a note for the requester..."></textarea>' +
+                '<p class="review-error">Remarks are required to reject or to add a remark.</p>' +
+            '</div>' +
+            '<div class="review-actions">' +
+                '<button type="button" class="logout-cancel-btn" data-review-cancel>Cancel</button>' +
+                '<button type="button" class="logout-cancel-btn" data-review-comment>Add remark only</button>' +
+                '<button type="button" class="logout-confirm-btn is-reject" data-review-reject>Reject</button>' +
+                '<button type="button" class="logout-confirm-btn is-approve" data-review-approve>Approve</button>' +
             '</div>' +
         '</div>';
 
     overlay.addEventListener('click', function (e) {
         if (e.target === overlay) closeApprovalDialog();
     });
-    overlay.querySelector('[data-approval-cancel]').addEventListener('click', closeApprovalDialog);
-    overlay.querySelector('[data-approval-confirm]').addEventListener('click', approveCurrentPpmp);
+    overlay.querySelector('[data-review-cancel]').addEventListener('click', closeApprovalDialog);
+    overlay.querySelector('[data-review-comment]').addEventListener('click', function () { submitReview('comment'); });
+    overlay.querySelector('[data-review-reject]').addEventListener('click', function () { submitReview('reject'); });
+    overlay.querySelector('[data-review-approve]').addEventListener('click', function () { submitReview('approve'); });
+    overlay.querySelector('#approvalRemarks').addEventListener('input', function () {
+        overlay.querySelector('#approvalRemarksField').classList.remove('has-error');
+    });
 
     document.body.appendChild(overlay);
     return overlay;
@@ -2791,9 +2806,9 @@ function onApprovalKeydown(e) {
     }
 
     if (e.key === 'Tab') {
-        const buttons = approvalDialogEl.querySelectorAll('button');
-        const first = buttons[0];
-        const last = buttons[buttons.length - 1];
+        const focusable = approvalDialogEl.querySelectorAll('textarea, button');
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
             e.preventDefault();
             last.focus();
@@ -2813,12 +2828,12 @@ function openApprovalDialog() {
     if (!currentEditingId) return;
 
     if (typeof canCurrentUserApprove !== 'function' || !canCurrentUserApprove()) {
-        showToast('Only an authorized approver can approve a PPMP.');
+        showToast('Only an authorized approver can review a PPMP.');
         return;
     }
     const currentRecord = (JSON.parse(localStorage.getItem('procurement_records')) || []).find(r => r.id == currentEditingId);
     if (getPpmpStatus(currentRecord) !== 'For Approval') {
-        showToast('This PPMP must be submitted for approval before it can be approved.');
+        showToast('This PPMP must be submitted for approval before it can be reviewed.');
         return;
     }
     if (!canSessionActOnRecord(currentRecord)) {
@@ -2832,22 +2847,28 @@ function openApprovalDialog() {
     const session = typeof getSession === 'function' ? getSession() : null;
     const who = session && session.roleName ? session.roleName : 'you';
 
-    document.getElementById('approvalTitle').textContent = 'Approve PPMP No. ' + ppmpNo + '?';
+    document.getElementById('approvalTitle').textContent = 'Review PPMP No. ' + ppmpNo;
     const stepIdx = APPROVAL_CHAIN.findIndex(step => step.role === currentRecord.currentApproverRole);
     const isLastStep = stepIdx === APPROVAL_CHAIN.length - 1;
     const nextStep = !isLastStep && stepIdx > -1 ? APPROVAL_CHAIN[stepIdx + 1] : null;
-    document.getElementById('approvalDesc').textContent = nextStep
-        ? 'This approves the PPMP at your stage and forwards it to the ' + nextStep.label +
-          '. The approval will be recorded under ' + who + '.'
-        : 'This is the final approval. It marks the PPMP as Final and closes it. It can no longer be edited, ' +
-          'get new items, or be deleted by the requesting office. The approval will be recorded under ' + who + '.';
+    document.getElementById('approvalDesc').textContent =
+        (nextStep
+            ? 'Approve to forward it to the ' + nextStep.label + '.'
+            : 'Approve is the final step: it marks the PPMP Final and closes it.') +
+        ' Reject returns it to the requesting office for revision (remarks required). ' +
+        'Your decision is recorded under ' + who + '.';
+
+    const box = document.getElementById('approvalRemarks');
+    box.value = '';
+    document.getElementById('approvalRemarksField').classList.remove('has-error');
 
     approvalPrevFocus = document.activeElement;
     approvalDialogEl.classList.add('show');
     document.addEventListener('keydown', onApprovalKeydown, true);
 
-    // Default focus on Cancel so a stray Enter never approves anything.
-    approvalDialogEl.querySelector('[data-approval-cancel]').focus();
+    // Focus the remarks box: Enter there only adds a new line, so a stray
+    // keypress can never approve or reject anything.
+    box.focus();
 }
 
 function closeApprovalDialog() {
@@ -2859,10 +2880,142 @@ function closeApprovalDialog() {
     }
 }
 
-function approveCurrentPpmp() {
+// action: 'approve' | 'reject' | 'comment'. Reject and comment need remarks.
+function submitReview(action) {
+    const field = document.getElementById('approvalRemarksField');
+    const box = document.getElementById('approvalRemarks');
+    const remarks = box ? box.value.trim() : '';
+
+    if (action !== 'approve' && !remarks) {
+        if (field) field.classList.add('has-error');
+        if (box) box.focus();
+        return;
+    }
+
     closeApprovalDialog();
-    const remarksField = document.getElementById('remarks');
-    performApprovalStep(remarksField ? remarksField.value : '');
+    performReviewAction(action, remarks);
+}
+
+// Kept for any old callers.
+function approveCurrentPpmp() {
+    const box = document.getElementById('approvalRemarks');
+    closeApprovalDialog();
+    performReviewAction('approve', box ? box.value : '');
+}
+
+// ---- Review history + "returned" banner inside the request modal ----
+
+const REVIEW_ACTION_LABELS = { approved: 'Approved', rejected: 'Rejected', remark: 'Remark', submitted: 'Submitted' };
+
+function applyReturnedBadge(record) {
+    const badge = document.getElementById('modalStatusBadge');
+    if (!badge) return;
+    const returned = typeof isPpmpReturned === 'function' && isPpmpReturned(record);
+    badge.classList.toggle('is-returned', returned);
+    if (returned) {
+        badge.textContent = 'Returned';
+        badge.classList.remove('is-draft');
+    }
+}
+
+function hideReviewRemarks() {
+    const box = document.getElementById('reviewRemarks');
+    if (box) box.classList.add('hidden');
+}
+
+function renderReviewRemarks(record) {
+    let box = document.getElementById('reviewRemarks');
+    const history = record && Array.isArray(record.remarksHistory) ? record.remarksHistory : [];
+    const returned = typeof isPpmpReturned === 'function' && isPpmpReturned(record);
+
+    if (!history.length && !returned) {
+        if (box) box.classList.add('hidden');
+        return;
+    }
+
+    if (!box) {
+        const anchor = document.querySelector('#requestModalOverlay .progress-section');
+        if (!anchor || !anchor.parentNode) return;
+        box = document.createElement('div');
+        box.id = 'reviewRemarks';
+        box.className = 'review-remarks';
+        anchor.parentNode.insertBefore(box, anchor);
+    }
+    box.innerHTML = '';
+
+    const when = ts => (typeof formatApprovalDateTime === 'function' ? formatApprovalDateTime(ts) : '');
+
+    // Everything below uses textContent, so remarks can never inject HTML.
+    if (returned) {
+        const lastRejection = history.slice().reverse().find(h => h.action === 'rejected');
+        const by = record.rejected_by && record.rejected_by.name ? record.rejected_by.name : 'an approver';
+        const banner = document.createElement('div');
+        banner.className = 'review-returned';
+
+        const title = document.createElement('strong');
+        title.textContent = 'Returned for revision by ' + by;
+        banner.appendChild(title);
+
+        if (lastRejection && lastRejection.remarks) {
+            const reason = document.createElement('span');
+            reason.textContent = lastRejection.remarks;
+            banner.appendChild(reason);
+        }
+
+        const meta = document.createElement('small');
+        meta.textContent = 'Edit the PPMP, then submit it for approval again.' +
+            (record.rejected_at ? ' \u00b7 ' + when(record.rejected_at) : '');
+        banner.appendChild(meta);
+        box.appendChild(banner);
+    }
+
+    if (history.length) {
+        const heading = document.createElement('p');
+        heading.className = 'review-history-title';
+        heading.textContent = 'Review history';
+        box.appendChild(heading);
+
+        const list = document.createElement('ul');
+        list.className = 'review-list';
+
+        history.forEach(h => {
+            const action = h.action || 'approved';   // older entries had no action
+            const stage = (typeof getApprovalStep === 'function' && getApprovalStep(h.stage)) || null;
+
+            const li = document.createElement('li');
+            li.className = 'review-item';
+
+            const head = document.createElement('div');
+            head.className = 'review-item-head';
+
+            const tag = document.createElement('span');
+            tag.className = 'review-tag is-' + action;
+            tag.textContent = REVIEW_ACTION_LABELS[action] || action;
+
+            const name = document.createElement('strong');
+            name.textContent = h.name || h.role || 'Approver';
+
+            const meta = document.createElement('span');
+            meta.textContent = [stage ? stage.label : h.stage, when(h.at)].filter(Boolean).join(' \u00b7 ');
+
+            head.appendChild(tag);
+            head.appendChild(name);
+            head.appendChild(meta);
+            li.appendChild(head);
+
+            if (h.remarks) {
+                const text = document.createElement('p');
+                text.className = 'review-item-text';
+                text.textContent = h.remarks;
+                li.appendChild(text);
+            }
+            list.appendChild(li);
+        });
+
+        box.appendChild(list);
+    }
+
+    box.classList.remove('hidden');
 }
 
 // Deletes just the item currently shown in the modal, rather than the
@@ -2994,9 +3147,18 @@ document.addEventListener('click', function (event) {
 // only the last stage (Regional Director) completes it.
 // ============================================================
 function performApprovalStep(remarksText) {
+    performReviewAction('approve', remarksText);
+}
+
+// The single implementation behind Approve / Reject / Add remark.
+//   approve -> forwards to the next stage (or completes after the last one)
+//   reject  -> back to the requesting office as an editable Draft ("Returned");
+//              the chain restarts from the first step when they resubmit
+//   comment -> logs a remark at the current stage without moving the PPMP
+function performReviewAction(action, remarksText) {
     const session = typeof getSession === 'function' ? getSession() : null;
     if (!session || !session.canApprove) {
-        showToast('Only an authorized approver can approve a PPMP.');
+        showToast('Only an authorized approver can review a PPMP.');
         return;
     }
     if (!currentEditingId) return;
@@ -3008,7 +3170,7 @@ function performApprovalStep(remarksText) {
     const record = db[idx];
 
     if (getPpmpStatus(record) !== 'For Approval') {
-        showToast('This PPMP must be submitted for approval before it can be approved.');
+        showToast('This PPMP must be submitted for approval before it can be reviewed.');
         return;
     }
     if (!canSessionActOnRecord(record)) {
@@ -3016,55 +3178,88 @@ function performApprovalStep(remarksText) {
         return;
     }
 
-    // 1. Record who approved at this stage, with their remarks
+    const remarks = (remarksText || '').trim();
+    if ((action === 'reject' || action === 'comment') && !remarks) {
+        showToast('Please enter remarks first.');
+        return;
+    }
+
+    // 1. Log the decision (who, which stage, what they said)
     if (!Array.isArray(record.remarksHistory)) record.remarksHistory = [];
     record.remarksHistory.push({
         stage: session.stage,
         role: session.role,
         name: session.roleName,
-        remarks: (remarksText || '').trim() || 'Approved.',
+        action: action === 'approve' ? 'approved' : (action === 'reject' ? 'rejected' : 'remark'),
+        remarks: remarks || 'Approved.',
+        round: Number(record.submission_round) || 1,
         date: new Date().toLocaleDateString(),
         at: Date.now()
     });
 
-    // 2. Advance to the next stage, or complete after the last one
-    const currentIdx = APPROVAL_CHAIN.findIndex(step => step.role === record.currentApproverRole);
+    // 2. Apply the decision
     let message;
 
-    if (currentIdx > -1 && currentIdx < APPROVAL_CHAIN.length - 1) {
-        const next = APPROVAL_CHAIN[currentIdx + 1];
-        record.currentApproverRole = next.role;      // status stays 'For Approval'
-        message = 'PPMP No. ' + record.ppmp_no + ' approved and forwarded to ' + next.label + '.';
-    } else {
-        record.status = 'Completed';
-        record.currentApproverRole = 'None';
-        record.is_indicative = 'Final';
-        record.approved_at = Date.now();
-        record.approved_by = {
+    if (action === 'comment') {
+        message = 'Remark added to PPMP No. ' + record.ppmp_no + '.';
+
+    } else if (action === 'reject') {
+        record.status = 'Draft';
+        record.currentApproverRole = null;
+        record.returned_for_revision = true;
+        record.rejected_at = Date.now();
+        record.rejected_by = {
             name: session.roleName,
             role: session.role,
-            email: session.email
+            email: session.email,
+            stage: session.stage
         };
-        message = 'PPMP No. ' + record.ppmp_no + ' fully approved and marked Final.';
+        message = 'PPMP No. ' + record.ppmp_no + ' rejected and returned to the requesting office.';
+
+    } else {
+        const currentIdx = APPROVAL_CHAIN.findIndex(step => step.role === record.currentApproverRole);
+
+        if (currentIdx > -1 && currentIdx < APPROVAL_CHAIN.length - 1) {
+            const next = APPROVAL_CHAIN[currentIdx + 1];
+            record.currentApproverRole = next.role;      // status stays 'For Approval'
+            message = 'PPMP No. ' + record.ppmp_no + ' approved and forwarded to ' + next.label + '.';
+        } else {
+            record.status = 'Completed';
+            record.currentApproverRole = 'None';
+            record.returned_for_revision = false;
+            record.is_indicative = 'Final';
+            record.approved_at = Date.now();
+            record.approved_by = {
+                name: session.roleName,
+                role: session.role,
+                email: session.email
+            };
+            message = 'PPMP No. ' + record.ppmp_no + ' fully approved and marked Final.';
+        }
     }
 
     try {
         localStorage.setItem('procurement_records', JSON.stringify(db));
     } catch (err) {
         console.error('Save failed', err);
-        showToast('Could not save the approval - please try again.');
+        showToast('Could not save your review - please try again.');
         return;
     }
 
-    closeRequestModal();
-    if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
+    if (action === 'comment') {
+        // Stay on the PPMP so the approver sees their remark in the history.
+        if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
+        loadRecordIntoModal(record.id, currentItemIndex);
+    } else {
+        closeRequestModal();
+        if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
+    }
     showToast(message);
 }
 
-// Footer "Approve & Forward" button (approver view).
+// Footer "Review & Decide" button (approver view): opens the review dialog.
 function approveWorkflowStep() {
-    const remarksField = document.getElementById('remarks');
-    performApprovalStep(remarksField ? remarksField.value : '');
+    openApprovalDialog();
 }
 
 // ============================================================

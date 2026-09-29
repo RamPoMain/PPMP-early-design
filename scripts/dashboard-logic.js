@@ -150,6 +150,13 @@ function isPpmpDraft(record) {
     return getPpmpStatus(record) === 'Draft';
 }
 
+// A Draft that an approver rejected and sent back to the requesting office.
+// It stays a normal editable Draft; this flag only drives the "Returned"
+// label and the rejection banner. Cleared when the requester resubmits.
+function isPpmpReturned(record) {
+    return !!record && getPpmpStatus(record) === 'Draft' && !!record.returned_for_revision;
+}
+
 // Locked = no longer editable by the requester (submitted or approved).
 function isPpmpLocked(record) {
     return !!record && getPpmpStatus(record) !== 'Draft';
@@ -159,6 +166,17 @@ function statusPillClass(status) {
     if (status === 'Completed') return 'is-completed';
     if (status === 'For Approval') return 'is-pending';
     return 'is-draft';
+}
+
+// Status pill for the Entries table ("Returned" replaces "Draft" after a rejection).
+function renderStatusPill(record, submittedTitle) {
+    if (isPpmpReturned(record)) {
+        const by = record.rejected_by && record.rejected_by.name ? record.rejected_by.name : 'an approver';
+        return '<span class="db-status-pill is-returned" title="Returned by ' + escapeHtml(by) +
+            ' - open the PPMP to read the remarks">Returned</span>';
+    }
+    const status = getPpmpStatus(record);
+    return '<span class="db-status-pill ' + statusPillClass(status) + '"' + (submittedTitle || '') + '>' + status + '</span>';
 }
 
 // Approved PPMPs can only be deleted by an approver.
@@ -349,7 +367,7 @@ function renderActivity(records) {
                     <span class="db-activity-icon ${icon.className}">${icon.svg}</span>
                     <div>
                         <p class="db-activity-text" title="${safeLabel}">${safeLabel}</p>
-                        <span class="db-activity-time">${time}${isPpmpClosed(record) && record.approved_by ? ' · Approved by ' + escapeHtml(record.approved_by.name) : (getPpmpStatus(record) === 'For Approval' ? ' · For approval' : (getPpmpStatus(record) === 'Draft' ? ' · Draft' : ''))}</span>
+                        <span class="db-activity-time">${time}${isPpmpClosed(record) && record.approved_by ? ' · Approved by ' + escapeHtml(record.approved_by.name) : (getPpmpStatus(record) === 'For Approval' ? ' · For approval' : (getPpmpStatus(record) === 'Draft' ? (isPpmpReturned(record) ? ' · Returned for revision' : ' · Draft') : ''))}</span>
                     </div>
                 </div>
                 
@@ -1055,6 +1073,9 @@ function confirmSubmitForApproval() {
 
     all[idx].status = 'For Approval';
     all[idx].submitted_at = Date.now();
+    // A resubmission after a rejection starts a new review round.
+    all[idx].returned_for_revision = false;
+    all[idx].submission_round = (Number(all[idx].submission_round) || 1) + (all[idx].rejected_at ? 1 : 0);
 
     if (session.stage === 'HEAD') {
         // Unit Head submitting for their own unit: counts as the head's approval.
@@ -1064,6 +1085,8 @@ function confirmSubmitForApproval() {
             stage: 'HEAD',
             role: session.role,
             name: session.roleName,
+            action: 'submitted',
+            round: all[idx].submission_round,
             remarks: 'Submitted by the Unit Head.',
             date: new Date().toLocaleDateString(),
             at: Date.now()
@@ -1200,7 +1223,7 @@ function renderEntries(records) {
                 <td>${escapeHtml(record.end_user || 'N/A')}</td>
                 <td>${escapeHtml(getRecordProjectTypeSummary(record))}</td>
                 <td>${escapeHtml(budget)}</td>
-                <td><span class="db-status-pill ${statusPillClass(status)}"${submittedTitle}>${status}</span></td>
+                <td>${renderStatusPill(record, submittedTitle)}</td>
                 <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
                 <td>${renderApprovedByCell(record)}</td>
             </tr>
@@ -1340,8 +1363,10 @@ function refreshDashboardRecords() {
     if (typeof renderStats === 'function') renderStats(records);
     if (typeof renderActivity === 'function') renderActivity(records);
     
-    // If we are on the entries.html page, this will update the table there too
-    if (typeof renderEntriesTable === 'function') renderEntriesTable(records);
+    // Entries page: render the table from the same (role-filtered) records.
+    // (Previously called a non-existent renderEntriesTable(), so the table
+    // stayed empty until a filter or search box was touched.)
+    if (typeof renderEntries === 'function') renderEntries(records);
 
     // Update the Notification Dot
     const notifDot = document.getElementById('notifDot');

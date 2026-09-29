@@ -8,13 +8,11 @@
 
     <script>
         (function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            if (savedTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-            }
-            document.documentElement.classList.add('preload');
+            // Same key and default as login/dashboard/entries ('dashboard_theme', dark)
+            // so the theme never flashes or flips when this page loads.
+            var savedTheme = 'dark';
+            try { savedTheme = localStorage.getItem('dashboard_theme') || 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-theme', savedTheme === 'light' ? 'light' : 'dark');
         })();
     </script>
 
