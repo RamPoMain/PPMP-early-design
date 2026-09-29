@@ -13,10 +13,20 @@ function getRecords() {
     // localStorage (see saveProcurementRequest, etc.) against the full,
     // unfiltered list, so this never risks losing other offices' data.
     const session = typeof getSession === 'function' ? getSession() : null;
-    if (!session || !session.office) return all;
+    if (!session) return all;
 
-    const office = session.office.trim().toLowerCase();
-    return all.filter(r => (r.end_user || '').trim().toLowerCase() === office);
+    const office = (session.office || '').trim().toLowerCase();
+    const isOwnOffice = r => !!office && (r.end_user || '').trim().toLowerCase() === office;
+
+    // Approvers see every office's PPMPs once they are submitted (For
+    // Approval) or approved (Completed) — never other offices' Drafts —
+    // plus anything belonging to their own office.
+    if (session.canApprove) {
+        return all.filter(r => getPpmpStatus(r) !== 'Draft' || isOwnOffice(r));
+    }
+
+    if (!office) return all;
+    return all.filter(isOwnOffice);
 }
 
 
@@ -78,6 +88,37 @@ function escapeHtml(value) {
 // ------------------------------------------------------------
 function isPpmpClosed(record) {
     return !!record && record.status === 'Completed';
+}
+
+// ------------------------------------------------------------
+// PPMP status lifecycle:  Draft  ->  For Approval  ->  Completed
+//   Draft         default; only the requesting office sees it, can edit it
+//   For Approval  submitted by the requester; now visible to approvers
+//                 (accounts with canApprove) and locked against edits
+//   Completed     approved (see isPpmpClosed above)
+// Records saved before this existed use the old 'Pending' status, which
+// is treated as Draft.
+// ------------------------------------------------------------
+function getPpmpStatus(record) {
+    if (!record) return 'Draft';
+    if (record.status === 'Completed') return 'Completed';
+    if (record.status === 'For Approval') return 'For Approval';
+    return 'Draft';
+}
+
+function isPpmpDraft(record) {
+    return getPpmpStatus(record) === 'Draft';
+}
+
+// Locked = no longer editable by the requester (submitted or approved).
+function isPpmpLocked(record) {
+    return !!record && getPpmpStatus(record) !== 'Draft';
+}
+
+function statusPillClass(status) {
+    if (status === 'Completed') return 'is-completed';
+    if (status === 'For Approval') return 'is-pending';
+    return 'is-draft';
 }
 
 // Approved PPMPs can only be deleted by an approver.
@@ -214,7 +255,7 @@ function renderStats(records) {
     totalEl.innerText = records.length;
 
     document.getElementById('stat-pending').innerText =
-        records.filter(r => r.status === 'Pending').length;
+        records.filter(r => getPpmpStatus(r) !== 'Completed').length;
 
     document.getElementById('stat-completed').innerText =
         records.filter(r => r.status === 'Completed').length;
@@ -268,7 +309,7 @@ function renderActivity(records) {
                     <span class="db-activity-icon ${icon.className}">${icon.svg}</span>
                     <div>
                         <p class="db-activity-text" title="${safeLabel}">${safeLabel}</p>
-                        <span class="db-activity-time">${time}${isPpmpClosed(record) && record.approved_by ? ' · Approved by ' + escapeHtml(record.approved_by.name) : ''}</span>
+                        <span class="db-activity-time">${time}${isPpmpClosed(record) && record.approved_by ? ' · Approved by ' + escapeHtml(record.approved_by.name) : (getPpmpStatus(record) === 'For Approval' ? ' · For approval' : (getPpmpStatus(record) === 'Draft' ? ' · Draft' : ''))}</span>
                     </div>
                 </div>
                 
@@ -294,13 +335,236 @@ function renderActivity(records) {
 }
 
 
-function buildExcelPreviewMarkup(record) {
+// ------------------------------------------------------------
+// Inline item editing (Excel preview dropdown on the Entries table)
+// A "draft" is a working copy of a record's items, created the moment
+// its dropdown is expanded and kept in memory until Save or Discard.
+// It survives re-renders (filters, add/remove item) but is never
+// written to localStorage until the person clicks Save Changes.
+// ------------------------------------------------------------
+let previewDrafts = {};
+let previewItemIdSeq = 0;
+
+const PREVIEW_PROJECT_TYPES = ['Consulting Services', 'Goods', 'Infrastructure'];
+
+const PREVIEW_MODE_GROUPS = [
+    { label: 'Competitive Mode', options: ['Competitive Bidding'] },
+    { label: 'Alternative Modes', options: [
+        'Limited Source Bidding', 'Direct Contracting', 'Repeat Order', 'Shopping',
+        'Small Value Procurement (SVP)', 'Direct Acquisition', 'Competitive Dialogue',
+        'Negotiated Procurement'
+    ] }
+];
+
+const PREVIEW_STRATEGY_OPTIONS = [
+    'Life Cycle Assessment (LCA) and LCCA', 'Subcontracting', 'Multi-Year Contracting',
+    'Design-and-Build Scheme for Infrastructure', 'Engagement of a Procurement Agent',
+    'Use of Framework Agreement Section', 'Pooled Procurement Section 17',
+    'Renewal of Regular and Recurring Services', 'Warehousing and Inventory Activities'
+];
+
+function blankPreviewItem() {
+    previewItemIdSeq += 1;
+    return {
+        id: Date.now() + previewItemIdSeq,
+        project_description: '', project_type: '', quantity_size: '', mode: '',
+        pre_procurement: '', start_date: '', end_date: '', delivery_period: '',
+        fund_source: '', budget: '', strategies: [], remarks: ''
+    };
+}
+
+// Reads straight from localStorage (not getRecords(), which filters by the
+// signed-in office) so drafts always compare against the true saved record.
+function getRawRecordById(id) {
+    const all = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    return all.find(r => r.id == id) || null;
+}
+
+function ensurePreviewDraft(record) {
+    if (!previewDrafts[record.id]) {
+        previewDrafts[record.id] = { items: JSON.parse(JSON.stringify(getRecordItems(record))) };
+    }
+    return previewDrafts[record.id];
+}
+
+// Which record (if any) is currently shown in the full-screen preview
+// modal — lets save/discard/add/remove refresh that surface too, on
+// top of the Entries table's inline dropdown (see refreshPreviewSurfaces).
+let activeExcelPreviewId = null;
+
+// Editable item editing is intentionally scoped to just these two
+// surfaces: the Entries page's inline dropdown, and the full-screen
+// Excel Preview modal (openable from both the Entries table and the
+// Dashboard's Recent Activity list). It never appears in the read-only
+// PDF export or anywhere on the Profile page.
+//
+// Nothing is editable until the person clicks "Edit". A draft only exists
+// while a PPMP is being edited, so "has a draft" == "is in edit mode":
+// Save, Cancel, collapsing the dropdown and closing the preview all delete
+// the draft and therefore drop back to the read-only view.
+function isPreviewEditing(recordId) {
+    return !!previewDrafts[recordId];
+}
+
+function startPreviewEdit(recordId) {
+    const record = getRawRecordById(recordId);
+    if (!record || isPpmpLocked(record)) return;
+
+    ensurePreviewDraft(record);
+    refreshPreviewSurfaces(recordId);
+}
+
+// The row-level buttons (add entry, Excel preview, view details, delete)
+// live in the expanded dropdown's toolbar, beside Edit, rather than in the
+// table's Action column.
+function buildEntryActionButtonsHtml(record) {
+    const recordId = Number(record.id);
+    const isPending = isPpmpDraft(record);
+
+    return `
+                <div class="db-entry-actions">
+                    ${isPending ? `
+                    <button type="button" class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
+                    </button>
+                    ` : ''}
+                    <button type="button" class="db-action-btn" title="Preview Excel Format" onclick="openExcelPreview(${recordId})">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V18.5C20 19.3 19.3 20 18.5 20H5.5C4.7 20 4 19.3 4 18.5V5.5Z"/><path d="M4 9H20M4 14H20M9 4V20M15 4V20"/></svg>
+                    </button>
+                    <button type="button" class="db-action-btn" title="View Details" onclick="openEntryRecord(${recordId})">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    ${canDeleteRecord(record) ? `<button type="button" class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </button>` : ''}
+                </div>`;
+}
+
+// options.record  -> also show that record's action buttons (view mode only,
+//                    so nobody navigates away mid-edit with unsaved changes)
+// options.canEdit -> false hides Edit (approved PPMPs); default true
+function buildPreviewToolbarHtml(recordId, options = {}) {
+    const canEdit = options.canEdit !== false;
+
+    if (!isPreviewEditing(recordId)) {
+        return `
+        <div class="ep-toolbar">
+            <span class="ep-dirty-indicator hidden" data-record-id="${recordId}">Unsaved changes</span>
+            <div class="ep-toolbar-actions">
+                ${options.record && options.actions !== false ? buildEntryActionButtonsHtml(options.record) : ''}
+                ${options.record && isPpmpDraft(options.record) ? `<button type="button" class="ep-submit-btn" onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>` : ''}
+                ${canEdit ? `<button type="button" class="ep-save-btn" onclick="startPreviewEdit(${recordId})">Edit</button>` : ''}
+            </div>
+        </div>
+    `;
+    }
+
+    return `
+        <div class="ep-toolbar">
+            <span class="ep-dirty-indicator${isPreviewDirty(recordId) ? '' : ' hidden'}" data-record-id="${recordId}">Unsaved changes</span>
+            <div class="ep-toolbar-actions">
+                <button type="button" class="ep-discard-btn" onclick="discardPreviewChanges(${recordId})">Cancel</button>
+                <button type="button" class="ep-save-btn" onclick="savePreviewChanges(${recordId})">Save Changes</button>
+            </div>
+        </div>
+    `;
+}
+
+// Re-renders whichever of the two surfaces above are currently showing
+// this record, so a save/discard/add/remove made in one place (say, the
+// full-screen modal) is reflected in the other if both happen to be
+// open for the same record.
+function refreshPreviewSurfaces(recordId) {
+    if (expandedEntryId === recordId) {
+        renderEntries(getRecords());
+    }
+    if (activeExcelPreviewId === recordId) {
+        const record = getRawRecordById(recordId);
+        if (record) {
+            renderExcelPreviewOverlay(record);
+        } else {
+            closeExcelPreview();
+        }
+    }
+}
+
+
+function isPreviewDirty(recordId) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return false;
+    const saved = getRawRecordById(recordId);
+    if (!saved) return true;
+    return JSON.stringify(draft.items) !== JSON.stringify(getRecordItems(saved));
+}
+
+function selectOptionsHtml(options, current) {
+    return options.map(opt =>
+        `<option value="${escapeHtml(opt)}"${opt === current ? ' selected' : ''}>${escapeHtml(opt)}</option>`
+    ).join('');
+}
+
+// Builds one editable item row (12 field columns + a Remove column).
+function buildEditableItemRow(record, item) {
+    const rid = Number(record.id);
+    const iid = item.id;
+    const field = (name, html) => html; // no-op, keeps call sites readable below
+
+    const modeOptionsHtml = PREVIEW_MODE_GROUPS.map(group =>
+        `<optgroup label="${escapeHtml(group.label)}">${selectOptionsHtml(group.options, item.mode)}</optgroup>`
+    ).join('');
+
+    const strategiesHtml = PREVIEW_STRATEGY_OPTIONS.map(opt => `
+        <label class="ep-strategy-opt">
+            <input type="checkbox" value="${escapeHtml(opt)}" data-record-id="${rid}" data-item-id="${iid}"
+                ${(Array.isArray(item.strategies) && item.strategies.includes(opt)) ? 'checked' : ''}
+                onchange="onPreviewStrategyToggle(this)">
+            <span>${escapeHtml(opt)}</span>
+        </label>
+    `).join('');
+
+    return `
+                        <tr data-preview-item-row="${iid}">
+                            <td>${field('project_description', `<textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="project_description" oninput="onPreviewFieldInput(this)" placeholder="Describe the project...">${escapeHtml(item.project_description || '')}</textarea>`)}</td>
+                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="project_type" onchange="onPreviewFieldInput(this)">
+                                <option value=""${!item.project_type ? ' selected' : ''}>Select...</option>
+                                ${selectOptionsHtml(PREVIEW_PROJECT_TYPES, item.project_type)}
+                            </select></td>
+                            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="quantity_size" oninput="onPreviewFieldInput(this)" placeholder="Quantity and size...">${escapeHtml(item.quantity_size || '')}</textarea></td>
+                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="mode" onchange="onPreviewFieldInput(this)">
+                                <option value=""${!item.mode ? ' selected' : ''}>Select mode...</option>
+                                ${modeOptionsHtml}
+                            </select></td>
+                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="pre_procurement" onchange="onPreviewFieldInput(this)">
+                                <option value=""${!item.pre_procurement ? ' selected' : ''}>Select...</option>
+                                ${selectOptionsHtml(['No', 'Yes'], item.pre_procurement)}
+                            </select></td>
+                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="start_date" value="${escapeHtml(item.start_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="end_date" value="${escapeHtml(item.end_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="delivery_period" value="${escapeHtml(item.delivery_period || '')}" oninput="onPreviewFieldInput(this)"></td>
+                            <td><input type="text" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="fund_source" value="${escapeHtml(item.fund_source || '')}" oninput="onPreviewFieldInput(this)" placeholder="Source of funds"></td>
+                            <td><input type="text" class="ep-input ep-budget" data-record-id="${rid}" data-item-id="${iid}" data-field="budget" value="${escapeHtml(item.budget || '')}" oninput="onPreviewFieldInput(this)" placeholder="0.00"></td>
+                            <td><div class="ep-strategies-box" data-record-id="${rid}" data-item-id="${iid}">${strategiesHtml}</div></td>
+                            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="remarks" oninput="onPreviewFieldInput(this)" placeholder="Remarks">${escapeHtml(item.remarks || '')}</textarea></td>
+                            <td class="ep-remove-cell">
+                                <button type="button" class="ep-remove-btn" title="Remove this item" onclick="removePreviewItem(${rid}, ${iid})">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6L18 18M18 6L6 18" stroke-linecap="round"/></svg>
+                                </button>
+                            </td>
+                        </tr>
+    `;
+}
+
+function buildExcelPreviewMarkup(record, editable) {
     const isIndicative = record.is_indicative === 'Indicative';
     const isFinal = record.is_indicative === 'Final';
-    const items = getRecordItems(record);
-    const formattedTotal = formatPesoExact(getRecordTotalBudget(record));
+    const items = editable ? ensurePreviewDraft(record).items : getRecordItems(record);
+    const formattedTotal = formatPesoExact(
+        items.reduce((sum, item) => sum + parseBudgetNumber(item.budget), 0)
+    );
 
-    const itemRows = items.map(item => {
+    const itemRows = editable
+        ? items.map(item => buildEditableItemRow(record, item)).join('')
+        : items.map(item => {
         const itemStrategies = Array.isArray(item.strategies)
             ? item.strategies.join(', ')
             : item.strategies || '';
@@ -350,6 +614,7 @@ function buildExcelPreviewMarkup(record) {
                             <th colspan="2">FUNDING DETAILS</th>
                             <th rowspan="2">ATTACHED SUPPORTING DOCUMENTS</th>
                             <th rowspan="2">REMARKS</th>
+                            ${editable ? '<th rowspan="2">Actions</th>' : ''}
                         </tr>
                         <tr>
                             <th>General Description and Objective of the Project to be Procured</th>
@@ -376,6 +641,7 @@ function buildExcelPreviewMarkup(record) {
                             <th>Column 10</th>
                             <th>Column 11</th>
                             <th>Column 12</th>
+                            ${editable ? '<th></th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -385,7 +651,18 @@ function buildExcelPreviewMarkup(record) {
                             <td class="excel-total-value">${escapeHtml(formattedTotal)}</td>
                             <td></td>
                             <td></td>
+                            ${editable ? '<td></td>' : ''}
                         </tr>
+                        ${editable ? `
+                        <tr class="ep-add-row">
+                            <td colspan="13">
+                                <button type="button" class="ep-add-btn" onclick="addItemViaRequestModal(${Number(record.id)})">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5V19M5 12H19" stroke-linecap="round"/></svg>
+                                    Add Item
+                                </button>
+                            </td>
+                        </tr>
+                        ` : ''}
                     </tbody>
                 </table>
             </div>
@@ -428,9 +705,21 @@ function buildExcelPreviewMarkup(record) {
 
 
 function openExcelPreview(id) {
-    const records = getRecords();
-    const record = records.find(item => item.id == id);
+    const record = getRecords().find(item => item.id == id);
     if (!record) return;
+
+    activeExcelPreviewId = record.id;
+    renderExcelPreviewOverlay(record);
+}
+
+
+// Builds/updates the full-screen preview modal's content for one record.
+// Called on first open (openExcelPreview) and again after any edit made
+// while it's open (refreshPreviewSurfaces), so Save/Discard/Add/Remove
+// all stay in sync without closing and reopening the modal.
+function renderExcelPreviewOverlay(record) {
+    const isEditable = !isPpmpLocked(record);          // may be edited (shows the Edit button)
+    const isEditing = isEditable && isPreviewEditing(record.id); // currently in edit mode
 
     let overlay = document.getElementById('excelPreviewOverlay');
 
@@ -458,7 +747,8 @@ function openExcelPreview(id) {
                 </div>
             </div>
             <div class="excel-preview-scroll">
-                ${buildExcelPreviewMarkup(record)}
+                ${isEditable ? buildPreviewToolbarHtml(Number(record.id), { record: record, actions: false }) : ''}
+                ${buildExcelPreviewMarkup(record, isEditing)}
             </div>
         </div>
     `;
@@ -471,6 +761,13 @@ function openExcelPreview(id) {
 function closeExcelPreview() {
     const overlay = document.getElementById('excelPreviewOverlay');
     if (!overlay) return;
+
+    // Closing discards any unsaved edits, the same as collapsing the
+    // Entries dropdown does — Save Changes is the only thing that persists.
+    if (activeExcelPreviewId !== null) {
+        delete previewDrafts[activeExcelPreviewId];
+        activeExcelPreviewId = null;
+    }
 
     overlay.classList.add('hidden');
     document.body.style.overflow = '';
@@ -490,7 +787,7 @@ function getFilteredEntryRecords(records) {
 
     return records.filter(record => {
         const items = getRecordItems(record);
-        const statusMatches = statusValue === 'All' || record.status === statusValue;
+        const statusMatches = statusValue === 'All' || getPpmpStatus(record) === statusValue;
         const indicativeMatches = indicativeValue === 'All' || record.is_indicative === indicativeValue;
         const typeMatches = typeValue === 'All' || items.some(item => item.project_type === typeValue);
         const searchHaystack = [
@@ -525,6 +822,274 @@ function getApprovedEntryNumbers(records) {
 }
 
 
+// ------------------------------------------------------------
+// Inline "Excel preview" dropdown on the Entries table.
+// Clicking a row's PPMP number expands a preview of that PPMP directly
+// under the row, built from the same buildExcelPreviewMarkup() used by
+// the full-screen preview. Because renderEntries() re-runs on every
+// filter/search change and re-derives this from the current filtered
+// list, the dropdown is automatically "filter-aware": if the expanded
+// PPMP gets filtered out, it collapses on its own.
+// ------------------------------------------------------------
+let expandedEntryId = null;
+
+function toggleEntryPreviewRow(id) {
+    if (expandedEntryId === id) {
+        delete previewDrafts[id];
+        expandedEntryId = null;
+    } else {
+        expandedEntryId = id;
+    }
+    renderEntries(getRecords());
+}
+
+// ------------------------------------------------------------
+// Inline item editing — field handlers. These write into the draft only
+// (never localStorage) and touch just the dirty indicator in the DOM, so
+// typing never triggers a full table re-render and never drops focus.
+// ------------------------------------------------------------
+function updatePreviewDirtyIndicator(recordId) {
+    document.querySelectorAll(`.ep-dirty-indicator[data-record-id="${recordId}"]`).forEach(el => {
+        el.classList.toggle('hidden', !isPreviewDirty(recordId));
+    });
+}
+
+function onPreviewFieldInput(el) {
+    const recordId = Number(el.dataset.recordId);
+    const itemId = Number(el.dataset.itemId);
+    const field = el.dataset.field;
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item) return;
+
+    item[field] = el.value;
+    updatePreviewDirtyIndicator(recordId);
+}
+
+function onPreviewStrategyToggle(checkbox) {
+    const recordId = Number(checkbox.dataset.recordId);
+    const itemId = Number(checkbox.dataset.itemId);
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item) return;
+
+    const current = new Set(Array.isArray(item.strategies) ? item.strategies : []);
+    if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
+    item.strategies = Array.from(current);
+    updatePreviewDirtyIndicator(recordId);
+}
+
+function addPreviewItem(recordId) {
+    const record = getRawRecordById(recordId);
+    if (!record || isPpmpLocked(record)) return;
+
+    const draft = ensurePreviewDraft(record);
+    draft.items.push(blankPreviewItem());
+    refreshPreviewSurfaces(recordId);
+}
+
+// "Add Item" in the preview dropdown now opens the request modal (the same
+// form as the "+" row button) instead of inserting a blank row to type into.
+// Unsaved inline edits are kept safe: closing the preview or hopping from
+// entries.html to index.html would discard them, so ask to save first.
+function addItemViaRequestModal(recordId) {
+    const record = getRawRecordById(recordId);
+    if (!record || isPpmpLocked(record)) return;
+
+    if (isPreviewDirty(recordId)) {
+        showToast('You have unsaved changes - Save or Discard them, then add the new item.');
+        return;
+    }
+
+    // Close the full-screen preview (if it is the surface being used) so the
+    // request modal is not opened underneath it.
+    if (activeExcelPreviewId !== null && typeof closeExcelPreview === 'function') {
+        closeExcelPreview();
+    }
+
+    requestAddEntryToPpmp(String(record.ppmp_no || ''));
+}
+
+// ------------------------------------------------------------
+// SUBMIT FOR APPROVAL
+// Moves a Draft PPMP to "For Approval". From then on it is visible to
+// approvers (see getRecords) and locked against edits by the requester.
+// Confirmation reuses the .logout-* dialog styling, like the approval one.
+// ------------------------------------------------------------
+let submitApprovalEl = null;
+let submitApprovalRecordId = null;
+let submitApprovalPrevFocus = null;
+
+function buildSubmitApprovalDialog() {
+    const overlay = document.createElement('div');
+    overlay.className = 'logout-overlay';
+    overlay.id = 'submitApprovalOverlay';
+    overlay.innerHTML =
+        '<div class="logout-modal" role="alertdialog" aria-modal="true" aria-labelledby="submitApprovalTitle" aria-describedby="submitApprovalDesc">' +
+            '<div class="logout-icon is-approve">' +
+                '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M5 12L19 5L15 19L11.5 13L5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+            '</div>' +
+            '<h3 id="submitApprovalTitle">Submit for approval?</h3>' +
+            '<p id="submitApprovalDesc"></p>' +
+            '<div class="logout-actions">' +
+                '<button type="button" class="logout-cancel-btn" data-submit-cancel>Cancel</button>' +
+                '<button type="button" class="logout-confirm-btn is-approve" data-submit-confirm>Submit</button>' +
+            '</div>' +
+        '</div>';
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeSubmitApprovalDialog();
+    });
+    overlay.querySelector('[data-submit-cancel]').addEventListener('click', closeSubmitApprovalDialog);
+    overlay.querySelector('[data-submit-confirm]').addEventListener('click', confirmSubmitForApproval);
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function onSubmitApprovalKeydown(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSubmitApprovalDialog();
+    }
+}
+
+function openSubmitApprovalDialog(recordId) {
+    const record = getRawRecordById(recordId);
+    if (!record || !isPpmpDraft(record)) return;
+
+    if (isPreviewDirty(recordId)) {
+        showToast('You have unsaved changes - Save or Cancel them before submitting.');
+        return;
+    }
+
+    if (!submitApprovalEl) submitApprovalEl = buildSubmitApprovalDialog();
+    submitApprovalRecordId = recordId;
+
+    document.getElementById('submitApprovalTitle').textContent =
+        'Submit PPMP No. ' + (record.ppmp_no || 'N/A') + ' for approval?';
+    document.getElementById('submitApprovalDesc').textContent =
+        'Its status will change from Draft to For Approval and it becomes visible to approvers. ' +
+        'While it is under review it can no longer be edited or get new items.';
+
+    submitApprovalPrevFocus = document.activeElement;
+    submitApprovalEl.classList.add('show');
+    document.addEventListener('keydown', onSubmitApprovalKeydown, true);
+
+    // Default focus on Cancel so a stray Enter never submits anything.
+    submitApprovalEl.querySelector('[data-submit-cancel]').focus();
+}
+
+function closeSubmitApprovalDialog() {
+    if (!submitApprovalEl) return;
+    submitApprovalEl.classList.remove('show');
+    document.removeEventListener('keydown', onSubmitApprovalKeydown, true);
+    if (submitApprovalPrevFocus && typeof submitApprovalPrevFocus.focus === 'function') {
+        submitApprovalPrevFocus.focus();
+    }
+}
+
+function confirmSubmitForApproval() {
+    const recordId = submitApprovalRecordId;
+    closeSubmitApprovalDialog();
+    submitApprovalRecordId = null;
+    if (recordId === null) return;
+
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session) return;
+
+    const all = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const idx = all.findIndex(r => r.id == recordId);
+    if (idx === -1) return;
+
+    if (!isPpmpDraft(all[idx])) {
+        showToast('This PPMP was already submitted for approval.');
+        refreshPreviewSurfaces(recordId);
+        return;
+    }
+
+    all[idx].status = 'For Approval';
+    all[idx].submitted_at = Date.now();
+    all[idx].submitted_by = {
+        name: session.roleName,
+        role: session.role,
+        email: session.email
+    };
+
+    try {
+        localStorage.setItem('procurement_records', JSON.stringify(all));
+    } catch (err) {
+        showToast('Could not submit for approval — please try again.');
+        return;
+    }
+
+    delete previewDrafts[recordId];
+    refreshDashboardRecords();
+    refreshPreviewSurfaces(recordId);
+    showToast('PPMP No. ' + all[idx].ppmp_no + ' submitted for approval.');
+}
+
+function removePreviewItem(recordId, itemId) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+
+    if (draft.items.length <= 1) {
+        showToast('A PPMP needs at least one item — add a replacement before removing this one.');
+        return;
+    }
+
+    draft.items = draft.items.filter(it => it.id != itemId);
+    refreshPreviewSurfaces(recordId);
+}
+
+// Resets the draft back to the last-saved version (does not collapse the
+// dropdown), so the person can see the discard take effect immediately.
+function discardPreviewChanges(recordId) {
+    delete previewDrafts[recordId];
+    refreshPreviewSurfaces(recordId);
+}
+
+function savePreviewChanges(recordId) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+
+    const hasEmptyDescription = draft.items.some(it => !String(it.project_description || '').trim());
+    if (hasEmptyDescription) {
+        showToast('Each item needs a project description before saving.');
+        return;
+    }
+
+    const all = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const idx = all.findIndex(r => r.id == recordId);
+    if (idx === -1) return;
+
+    if (getPpmpStatus(all[idx]) !== 'Draft') {
+        showToast('This PPMP was submitted or approved while you were editing, so it is now read-only.');
+        delete previewDrafts[recordId];
+        refreshPreviewSurfaces(recordId);
+        return;
+    }
+
+    all[idx].items = JSON.parse(JSON.stringify(draft.items));
+
+    try {
+        localStorage.setItem('procurement_records', JSON.stringify(all));
+    } catch (err) {
+        showToast('Could not save changes — please try again.');
+        return;
+    }
+
+    delete previewDrafts[recordId];
+    refreshDashboardRecords();
+    refreshPreviewSurfaces(recordId);
+    showToast('PPMP items saved.');
+}
+
+
 function renderEntries(records) {
     const tbody = document.getElementById('entriesTableBody');
     if (!tbody) return;
@@ -533,6 +1098,11 @@ function renderEntries(records) {
     const resultCount = document.getElementById('entriesResultCount');
     const filteredRecords = getFilteredEntryRecords(records).sort((a, b) => b.id - a.id);
     const approvedNumbers = getApprovedEntryNumbers(records);
+
+    if (expandedEntryId !== null && !filteredRecords.some(r => r.id == expandedEntryId)) {
+        delete previewDrafts[expandedEntryId];
+        expandedEntryId = null;
+    }
 
     if (resultCount) {
         resultCount.textContent =
@@ -549,43 +1119,44 @@ function renderEntries(records) {
     if (emptyState) emptyState.classList.add('hidden');
 
     tbody.innerHTML = filteredRecords.map(record => {
-        const status = record.status === 'Completed' ? 'Completed' : 'Pending';
+        const status = getPpmpStatus(record);
+        const submittedTitle = status === 'For Approval' && record.submitted_by
+            ? ` title="Submitted by ${escapeHtml(record.submitted_by.name)}${record.submitted_at ? ' on ' + escapeHtml(formatApprovalDate(record.submitted_at)) : ''}"`
+            : '';
         const ppmpType = record.is_indicative === 'Final' ? 'Final' : (record.is_indicative === 'Indicative' ? 'Indicative' : 'N/A');
         const description = getRecordDescriptionSummary(record);
         const budget = formatPeso(getRecordTotalBudget(record));
         const recordId = Number(record.id);
         const entryNumber = approvedNumbers.get(String(record.id));
+        const isExpanded = expandedEntryId === record.id;
+        const isEditable = isExpanded && !isPpmpLocked(record);
+        const isEditing = isEditable && isPreviewEditing(record.id);
 
         return `
             <tr>
                 <td class="db-entry-number"${entryNumber ? '' : ' style="opacity:.4" title="Numbered once approved"'}>${entryNumber || '—'}</td>
-                <td><strong>PPMP No. ${escapeHtml(record.ppmp_no || 'N/A')}</strong><span>${escapeHtml(record.fiscal_year || '')}</span></td>
+                <td class="db-entry-ppmp-cell${isExpanded ? ' is-expanded' : ''}" onclick="toggleEntryPreviewRow(${recordId})" title="${isExpanded ? 'Hide' : 'Show'} Excel preview">
+                    <svg class="db-entry-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6L15 12L9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div><strong>PPMP No. ${escapeHtml(record.ppmp_no || 'N/A')}</strong><span>${escapeHtml(record.fiscal_year || '')}</span></div>
+                </td>
                 <td class="db-entry-description">${escapeHtml(description)}</td>
                 <td>${escapeHtml(record.end_user || 'N/A')}</td>
                 <td>${escapeHtml(getRecordProjectTypeSummary(record))}</td>
                 <td>${escapeHtml(budget)}</td>
-                <td><span class="db-status-pill ${status === 'Completed' ? 'is-completed' : 'is-pending'}">${status}</span></td>
+                <td><span class="db-status-pill ${statusPillClass(status)}"${submittedTitle}>${status}</span></td>
                 <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
                 <td>${renderApprovedByCell(record)}</td>
-                <td>
-                    <div class="db-entry-actions">
-                        ${status === 'Pending' ? `
-                        <button class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
-                        </button>
-                        ` : ''}
-                        <button class="db-action-btn" title="Preview Excel Format" onclick="openExcelPreview(${recordId})">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V18.5C20 19.3 19.3 20 18.5 20H5.5C4.7 20 4 19.3 4 18.5V5.5Z"/><path d="M4 9H20M4 14H20M9 4V20M15 4V20"/></svg>
-                        </button>
-                        <button class="db-action-btn" title="View Details" onclick="openEntryRecord(${recordId})">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
-                        ${canDeleteRecord(record) ? `<button class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                        </button>` : ''}
+            </tr>
+            ${isExpanded ? `
+            <tr class="db-entry-expand-row">
+                <td colspan="9">
+                    <div class="db-entry-expand-inner">
+                        ${buildPreviewToolbarHtml(Number(record.id), { record: record, canEdit: isEditable })}
+                        ${buildExcelPreviewMarkup(record, isEditing)}
                     </div>
                 </td>
             </tr>
+            ` : ''}
         `;
     }).join('');
 }
@@ -601,7 +1172,10 @@ function refreshDashboardRecords() {
     const notifDot = document.getElementById('notifDot');
 
     if (notifDot) {
-        const pendingCount = records.filter(r => r.status === 'Pending').length;
+        const approver = typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
+        const pendingCount = records.filter(r => approver
+            ? getPpmpStatus(r) === 'For Approval'
+            : getPpmpStatus(r) !== 'Completed').length;
         notifDot.classList.toggle('hidden', pendingCount === 0);
     }
 }
@@ -694,8 +1268,8 @@ function deleteRecordItem(recordId, itemId) {
 
     const records = getRecords();
     const record = records.find(r => r.id == recordId);
-    if (isPpmpClosed(record)) {
-        showToast('This PPMP is approved and closed — its items can no longer be deleted.');
+    if (isPpmpLocked(record)) {
+        showToast('This PPMP was submitted for approval or approved — its items can no longer be deleted.');
         return;
     }
     const items = record && typeof getRecordItems === 'function' ? getRecordItems(record) : [];

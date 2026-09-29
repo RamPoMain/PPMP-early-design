@@ -281,7 +281,7 @@ function getPendingPpmpGroups() {
     const groups = new Map();
 
     records.forEach(record => {
-        if (record.status !== 'Pending') return;
+        if (getPpmpStatus(record) !== 'Draft') return;
 
         const key = String(record.ppmp_no || 'N/A');
         const itemCount = (typeof getRecordItems === 'function' ? getRecordItems(record) : [record]).length;
@@ -709,7 +709,7 @@ function saveProcurementRequest() {
 
             items: [itemPayload],
 
-            status: 'Pending',
+            status: 'Draft',
             approved_at: undefined,
             date: new Date().toLocaleDateString()
         };
@@ -2425,7 +2425,8 @@ function addEntryToPpmp(ppmpNo) {
     document.body.style.overflow = 'hidden';
 
     const records = typeof getRecords === 'function' ? getRecords() : [];
-    const groupRecord = records.find(r => String(r.ppmp_no) === String(ppmpNo));
+    const groupRecord = records.find(r => String(r.ppmp_no) === String(ppmpNo) && getPpmpStatus(r) === 'Draft')
+        || records.find(r => String(r.ppmp_no) === String(ppmpNo));
 
     currentEditingId = groupRecord ? groupRecord.id : null;
     currentEditingItemId = null; // null here means "this save creates a new item"
@@ -2598,10 +2599,12 @@ function updateStatusBadge(status) {
     const badge = document.getElementById('modalStatusBadge');
     if (!badge) return;
 
-    const isCompleted = status === 'Completed';
-    badge.textContent = isCompleted ? 'Completed' : 'Pending';
-    badge.classList.toggle('is-completed', isCompleted);
-    badge.classList.toggle('is-pending', !isCompleted);
+    const label = status === 'Completed' ? 'Completed'
+        : (status === 'For Approval' ? 'For Approval' : 'Draft');
+    badge.textContent = label;
+    badge.classList.toggle('is-completed', label === 'Completed');
+    badge.classList.toggle('is-pending', label === 'For Approval');
+    badge.classList.toggle('is-draft', label === 'Draft');
 }
 
 // ============================================================
@@ -2611,6 +2614,12 @@ function updateStatusBadge(status) {
 // records who approved it and when. A closed PPMP is read-only:
 // no edits, no new items, no item deletion.
 // ============================================================
+
+function isCurrentPpmpLocked() {
+    if (!currentEditingId) return false;
+    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    return getPpmpStatus(db.find(r => r.id == currentEditingId)) !== 'Draft';
+}
 
 function isCurrentPpmpClosed() {
     if (!currentEditingId) return false;
@@ -2634,7 +2643,8 @@ function updateVerifyButtonLabel() {
 
 // Shows/hides the modal controls for a record in view mode.
 function applyApprovalState(record) {
-    const isClosed = !!record && record.status === 'Completed';
+    const status = getPpmpStatus(record);
+    const isLocked = status !== 'Draft';           // submitted or approved: requester can't edit
     const canApprove = typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
 
     updateStatusBadge(record.status);
@@ -2642,13 +2652,13 @@ function applyApprovalState(record) {
     renderApprovalInfo(record);
 
     const verifyBtn = document.getElementById('verifyRequestBtn');
-    if (verifyBtn) verifyBtn.classList.toggle('hidden', isClosed || !canApprove);
+    if (verifyBtn) verifyBtn.classList.toggle('hidden', status !== 'For Approval' || !canApprove);
 
     const editBtn = document.getElementById('editRequestBtn');
-    if (editBtn) editBtn.classList.toggle('hidden', isClosed);
+    if (editBtn) editBtn.classList.toggle('hidden', isLocked);
 
     const deleteItemBtn = document.getElementById('deleteItemBtn');
-    if (deleteItemBtn) deleteItemBtn.classList.toggle('hidden', isClosed);
+    if (deleteItemBtn) deleteItemBtn.classList.toggle('hidden', isLocked);
 }
 
 // Green banner near the top of the modal: who approved and when.
@@ -2767,7 +2777,11 @@ function openApprovalDialog() {
         showToast('Only an authorized approver can approve a PPMP.');
         return;
     }
-    if (isCurrentPpmpClosed()) return;
+    const currentRecord = (JSON.parse(localStorage.getItem('procurement_records')) || []).find(r => r.id == currentEditingId);
+    if (getPpmpStatus(currentRecord) !== 'For Approval') {
+        showToast('This PPMP must be submitted for approval before it can be approved.');
+        return;
+    }
 
     if (!approvalDialogEl) approvalDialogEl = buildApprovalDialog();
 
@@ -2811,7 +2825,10 @@ function approveCurrentPpmp() {
     const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
     const idx = db.findIndex(r => r.id == currentEditingId);
     if (idx === -1) return;
-    if (db[idx].status === 'Completed') return;
+    if (getPpmpStatus(db[idx]) !== 'For Approval') {
+        showToast('This PPMP must be submitted for approval before it can be approved.');
+        return;
+    }
 
     db[idx].status = 'Completed';
     db[idx].is_indicative = 'Final';
@@ -2855,8 +2872,8 @@ function deleteCurrentItem() {
 }
 
 function enableEditMode() {
-    if (isCurrentPpmpClosed()) {
-        showToast('This PPMP is approved and closed — it can no longer be edited.');
+    if (isCurrentPpmpLocked()) {
+        showToast('This PPMP is submitted for approval or approved — it can no longer be edited.');
         return;
     }
 

@@ -1103,3 +1103,281 @@ html[data-theme="light"] .approval-info strong { color: #15803D; }
     color: var(--db-text-faint);
     font-size: 13px;
 }
+
+/* ============================================================
+   ENTRIES TABLE — inline Excel preview dropdown
+   Clicking the PPMP No. cell expands a row directly beneath it
+   showing the same sheet markup as the full-screen Excel preview,
+   filtered/collapsed in step with renderEntries() (see dashboard-logic.js).
+   ============================================================ */
+
+.db-entry-ppmp-cell {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    transition: background 0.12s ease;
+}
+
+.db-entry-ppmp-cell:hover {
+    background: var(--db-card-alt);
+}
+
+.db-entry-chevron {
+    flex-shrink: 0;
+    margin-top: 4px;
+    color: var(--db-text-faint);
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.db-entry-ppmp-cell.is-expanded .db-entry-chevron {
+    transform: rotate(90deg);
+    color: var(--db-accent);
+}
+
+.db-entry-expand-row td {
+    padding: 0 !important;
+    border-top: none;
+}
+
+.db-entry-expand-inner {
+    padding: 4px 14px 18px;
+    background: var(--db-card-alt);
+    animation: entry-expand-in 0.16s ease;
+}
+
+.db-entry-expand-inner .excel-preview-sheet {
+    min-width: 0;
+    width: 100%;
+    max-height: 480px;
+    overflow: auto;
+    border-radius: 8px;
+}
+
+@keyframes entry-expand-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 760px) {
+    .db-entry-expand-inner .excel-preview-sheet {
+        max-height: 380px;
+    }
+}
+
+/* ============================================================
+   ENTRIES TABLE — inline item editing in the Excel preview
+   Applies inside .db-entry-expand-inner when a Pending PPMP's
+   dropdown is open. Read-only (Completed) PPMPs never render
+   these classes — see buildExcelPreviewMarkup()'s editable flag.
+   ============================================================ */
+
+.ep-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 2px 12px;
+}
+
+.ep-dirty-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--db-amber);
+}
+
+.ep-dirty-indicator::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--db-amber);
+}
+
+.ep-dirty-indicator.hidden {
+    visibility: hidden;
+}
+
+.ep-toolbar-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.ep-discard-btn,
+.ep-save-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ep-discard-btn {
+    background: transparent;
+    color: var(--db-text);
+    border: 1px solid var(--db-field-border);
+}
+
+.ep-discard-btn:hover {
+    background: var(--db-card);
+}
+
+.ep-save-btn {
+    background: var(--db-accent);
+    color: #fff;
+    border: 1px solid var(--db-accent);
+}
+
+.ep-save-btn:hover {
+    background: #2563EB;
+}
+
+/* Inputs inside the sheet-styled table (white background, dark text
+   to match .excel-preview-sheet, which stays white regardless of theme) */
+.ep-input {
+    width: 100%;
+    min-width: 90px;
+    padding: 4px 5px;
+    border: 1px solid #c7c7c7;
+    border-radius: 4px;
+    background: #fff;
+    color: #000;
+    font-family: Arial, sans-serif;
+    font-size: 10.5px;
+    line-height: 1.3;
+}
+
+textarea.ep-input {
+    resize: vertical;
+    min-height: 40px;
+}
+
+.ep-input:focus {
+    outline: none;
+    border-color: #0088ff;
+    box-shadow: 0 0 0 2px rgba(0, 136, 255, 0.15);
+}
+
+.ep-budget {
+    min-width: 70px;
+    text-align: right;
+}
+
+.ep-strategies-box {
+    max-height: 92px;
+    min-width: 150px;
+    overflow-y: auto;
+    padding: 3px 5px;
+    border: 1px solid #c7c7c7;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.ep-strategy-opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 2px 0;
+    font-size: 9.5px;
+    line-height: 1.25;
+    color: #000;
+    cursor: pointer;
+}
+
+.ep-strategy-opt input {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.ep-remove-cell {
+    text-align: center;
+    vertical-align: middle !important;
+}
+
+.ep-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid #e5b4b4;
+    border-radius: 6px;
+    background: #fdf0f0;
+    color: #b91c1c;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.ep-remove-btn:hover {
+    background: #fbdada;
+}
+
+.ep-add-row td {
+    padding: 8px 6px !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: #fafafa;
+}
+
+.ep-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px dashed #9ca3af;
+    border-radius: 6px;
+    background: #fff;
+    color: #374151;
+    font-family: Arial, sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ep-add-btn:hover {
+    background: #f0f7ff;
+    border-color: #0088ff;
+    color: #0088ff;
+}
+
+/* ============================================================
+   DRAFT / FOR APPROVAL STATUS
+   Draft -> For Approval -> Completed. "For Approval" reuses the amber
+   .is-pending look; Draft is neutral grey.
+   ============================================================ */
+
+.db-status-pill { white-space: nowrap; }
+
+.db-status-pill.is-draft {
+    background: rgba(148, 163, 184, 0.16);
+    color: var(--db-text-dim);
+}
+
+.modal-status-badge.is-draft {
+    background: rgba(148, 163, 184, 0.16);
+    color: var(--db-text-dim, #94A3B8);
+}
+
+.ep-submit-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    background: transparent;
+    color: var(--db-accent);
+    border: 1px solid var(--db-accent);
+    transition: background 0.15s ease;
+}
+
+.ep-submit-btn:hover { background: var(--db-accent-soft); }
