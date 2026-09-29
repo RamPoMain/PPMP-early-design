@@ -838,11 +838,13 @@ function getFilteredEntryRecords(records) {
     const statusFilter = document.getElementById('entryStatusFilter');
     const indicativeFilter = document.getElementById('entryIndicativeFilter');
     const typeFilter = document.getElementById('entryTypeFilter');
+    const officeFilter = document.getElementById('entryOfficeFilter');
     const searchInput = document.getElementById('entrySearchInput');
 
     const statusValue = statusFilter ? statusFilter.value : 'All';
     const indicativeValue = indicativeFilter ? indicativeFilter.value : 'All';
     const typeValue = typeFilter ? typeFilter.value : 'All';
+    const officeValue = officeFilter ? officeFilter.value : 'All';
     const searchValue = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     return records.filter(record => {
@@ -850,6 +852,7 @@ function getFilteredEntryRecords(records) {
         const statusMatches = statusValue === 'All' || getPpmpStatus(record) === statusValue;
         const indicativeMatches = indicativeValue === 'All' || record.is_indicative === indicativeValue;
         const typeMatches = typeValue === 'All' || items.some(item => item.project_type === typeValue);
+        const officeMatches = officeValue === 'All' || record.end_user === officeValue;
         const searchHaystack = [
             record.ppmp_no,
             record.end_user,
@@ -859,16 +862,18 @@ function getFilteredEntryRecords(records) {
             ...items.map(item => item.mode)
         ].join(' ').toLowerCase();
 
-        return statusMatches && indicativeMatches && typeMatches && (!searchValue || searchHaystack.includes(searchValue));
+        return statusMatches && indicativeMatches && typeMatches && officeMatches && (!searchValue || searchHaystack.includes(searchValue));
     });
 }
 
 
 function getApprovedEntryNumbers(records) {
-    // Only approved (Completed) entries get a number, assigned in the order
-    // they were approved. Pending entries, filters and new requests never
-    // shift these numbers.
+    // Only approved (Completed) entries get a number, and every office is
+    // numbered on its own: FPIAP's fifth approval is "5" while an office with
+    // nothing approved yet has no number at all. Numbers follow approval order
+    // within the office and never shift because of filters or new requests.
     const numbers = new Map();
+    const perOffice = new Map();
 
     records
         .filter(record => record.status === 'Completed')
@@ -876,9 +881,41 @@ function getApprovedEntryNumbers(records) {
             (Number(a.approved_at) || Number(a.id)) -
             (Number(b.approved_at) || Number(b.id))
         )
-        .forEach((record, index) => numbers.set(String(record.id), index + 1));
+        .forEach(record => {
+            const office = record.end_user || 'N/A';
+            const next = (perOffice.get(office) || 0) + 1;
+            perOffice.set(office, next);
+            numbers.set(String(record.id), next);
+        });
 
     return numbers;
+}
+
+
+// Fills the Office filter from the offices present in the records this account
+// can see. Hidden when there is only one (requesting offices), so it only shows
+// up for reviewers. Rebuilt only when the list changes, so an open dropdown
+// is never disturbed by a re-render.
+function populateOfficeFilter(records) {
+    const select = document.getElementById('entryOfficeFilter');
+    if (!select) return;
+
+    const offices = [...new Set(records.map(r => r.end_user).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+
+    const wrap = select.closest('.db-filter-control');
+    if (wrap) wrap.classList.toggle('hidden', offices.length < 2);
+
+    const wanted = ['All'].concat(offices);
+    const have = Array.from(select.options).map(o => o.value);
+
+    if (JSON.stringify(wanted) !== JSON.stringify(have)) {
+        const current = select.value;
+        select.innerHTML = wanted.map(o =>
+            '<option value="' + escapeHtml(o) + '">' + (o === 'All' ? 'All offices' : escapeHtml(o)) + '</option>'
+        ).join('');
+        select.value = wanted.includes(current) ? current : 'All';
+    }
 }
 
 
@@ -1178,6 +1215,7 @@ function renderEntries(records) {
 
     const emptyState = document.getElementById('entriesEmptyState');
     const resultCount = document.getElementById('entriesResultCount');
+    populateOfficeFilter(records);
     const filteredRecords = getFilteredEntryRecords(records).sort((a, b) => b.id - a.id);
     const approvedNumbers = getApprovedEntryNumbers(records);
 
@@ -1189,7 +1227,7 @@ function renderEntries(records) {
     if (resultCount) {
         resultCount.textContent =
             `${filteredRecords.length} ${filteredRecords.length === 1 ? 'entry' : 'entries'}` +
-            ` · ${approvedNumbers.size} approved`;
+            ` · ${filteredRecords.filter(r => r.status === 'Completed').length} approved`;
     }
 
     if (filteredRecords.length === 0) {
@@ -1216,7 +1254,7 @@ function renderEntries(records) {
 
         return `
             <tr>
-                <td class="db-entry-number"${entryNumber ? '' : ' style="opacity:.4" title="Numbered once approved"'}>${entryNumber || '—'}</td>
+                <td class="db-entry-number"${entryNumber ? '' : ' style="opacity:.4" title="Numbered within its office once approved"'}>${entryNumber || '—'}</td>
                 <td class="db-entry-ppmp-cell${isExpanded ? ' is-expanded' : ''}" onclick="toggleEntryPreviewRow(${recordId})" title="${isExpanded ? 'Hide' : 'Show'} Excel preview">
                     <svg class="db-entry-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6L15 12L9 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <div><strong>PPMP No. ${escapeHtml(record.ppmp_no || 'N/A')}</strong><span>${escapeHtml(record.fiscal_year || '')}</span></div>
@@ -1244,7 +1282,7 @@ function renderEntries(records) {
 }
 
 function initEntryFilters() {
-    ['entryStatusFilter', 'entryIndicativeFilter', 'entryTypeFilter', 'entrySearchInput'].forEach(id => {
+    ['entryStatusFilter', 'entryIndicativeFilter', 'entryTypeFilter', 'entryOfficeFilter', 'entrySearchInput'].forEach(id => {
         const control = document.getElementById(id);
         if (!control) return;
 

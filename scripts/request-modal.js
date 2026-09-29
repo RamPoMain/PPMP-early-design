@@ -227,8 +227,15 @@ function clearAllFieldErrors() {
 function getNextPpmpNumber() {
     const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
 
-    // THE FILTER: Only look at records that are already "Completed" (Verified)
-    const approvedRecords = records.filter(record => record.status === 'Completed');
+    // THE FILTER: Only look at records that are already "Completed" (Verified),
+    // and only this office's own - every office numbers its PPMPs from 1
+    // independently, so another office's approvals never move your next number.
+    // (Accounts without an office fall back to counting everything.)
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const office = session && session.office ? session.office : null;
+    const approvedRecords = records.filter(record =>
+        record.status === 'Completed' && (!office || record.end_user === office)
+    );
 
     let highestNumber = 0;
 
@@ -239,8 +246,8 @@ function getNextPpmpNumber() {
         }
     });
 
-    // Returns the next number after the highest approved one
-    // If no approved records exist, it starts at 1
+    // Returns the next number after this office's highest approved one
+    // If the office has no approved records yet, it starts at 1
     return highestNumber + 1;
 }
 
