@@ -47,8 +47,10 @@ function getRecords() {
             return true;
         }
 
-        // 2. Fully approved PPMPs are visible to everyone.
-        if (record.status === 'Completed') {
+        // 2. Fully approved PPMPs are visible to reviewers (TOD, Budget Officer,
+        //    Regional Director) - but NOT to requesting offices, which only ever
+        //    see their own office's PPMPs (rule 1 above), including Unit Heads.
+        if (record.status === 'Completed' && !session.canRequest) {
             return true;
         }
 
@@ -1302,7 +1304,8 @@ function setConfirmModalText(title, message) {
 // 1. Function called when clicking the trash icon on a whole PPMP row
 function deleteRecord(id) {
     const target = getRecords().find(r => r.id == id);
-    if (target && !canDeleteRecord(target)) {
+    if (!target) return; // not visible to this account, so not theirs to delete
+    if (!canDeleteRecord(target)) {
         showToast('An approved PPMP is closed and can only be deleted by an approver.');
         return;
     }

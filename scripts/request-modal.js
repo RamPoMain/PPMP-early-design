@@ -2551,6 +2551,10 @@ function loadRecordIntoModal(id, itemIndex = 0) {
     const data = records.find(r => r.id == id);
     if (!data) return;
 
+    // Only open records this account is allowed to see (e.g. an office can
+    // never open another office's PPMP by id).
+    if (typeof getRecords === 'function' && !getRecords().some(r => r.id == data.id)) return;
+
     isViewMode = true;
     currentEditingId = data.id;
 
