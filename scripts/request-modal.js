@@ -31,12 +31,19 @@ let isViewMode = false;
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;   // 2MB per file
 const MAX_TOTAL_SIZE = 8 * 1024 * 1024;  // 8MB total
+// Approval chain. `role` is a STAGE code: it must equal the `stage` set on the
+// approver's account in Auth.js, and is what record.currentApproverRole stores.
+// (The record's `status` stays 'For Approval' for the whole chain.)
 const APPROVAL_CHAIN = [
-    { role: 'Unit Head', label: 'Unit Head', statusLabel: 'Pending Unit Head Approval' },
-    { role: 'TOD', label: 'TOD', statusLabel: 'Pending TOD Approval' },
-    { role: 'Budget Officer', label: 'Budget Officer', statusLabel: 'Pending Budget Officer Approval' },
-    { role: 'Regional Director', label: 'Regional Director', statusLabel: 'Pending RD Approval' }
+    { role: 'HEAD', label: 'Unit Head' },
+    { role: 'TOD',  label: 'Technical Operations Division' },
+    { role: 'BO',   label: 'Budget Officer' },
+    { role: 'RD',   label: 'Regional Director' }
 ];
+
+function getApprovalStep(stage) {
+    return APPROVAL_CHAIN.find(step => step.role === stage) || null;
+}
 
 // ============================================================
 // REQUIRED DOCUMENT BY TYPE OF PROJECT
@@ -51,7 +58,7 @@ const PROJECT_TYPE_DOC_LABELS = {
 };
 
 function getCurrentUser() {
-    return JSON.parse(localStorage.getItem('currentUser')) || { role: 'ILCDB', canApprove: false };
+    return (typeof getSession === 'function' && getSession()) || { role: null, canApprove: false, canRequest: false };
 }
 
 function updateDocTypeHint() {
@@ -721,8 +728,8 @@ function saveProcurementRequest() {
 
             items: [itemPayload],
 
-            status: 'Pending Unit Head Approval', // Initial status
-            currentApproverRole: 'Unit Head',      // Points to the first approver
+            status: 'Draft',                // becomes 'For Approval' on submit
+            currentApproverRole: null,      // set to the first stage on submit
             remarksHistory: [],
             date: new Date().toLocaleDateString()
         };
@@ -780,56 +787,6 @@ function saveProcurementRequest() {
 // ============================================================
 
 // --- ADDITION: WORKFLOW STEERING FUNCTION ---
-function approveWorkflowStep() {
-    if (!currentEditingId) return;
-
-    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
-    const idx = db.findIndex(r => r.id == currentEditingId);
-    if (idx === -1) return;
-
-    const record = db[idx];
-    const session = getSessionUser();
-    const remarksText = document.getElementById('remarks').value;
-
-    // 1. Save the remarks to a history array so everyone can see them
-    if (!record.remarksHistory) record.remarksHistory = [];
-    record.remarksHistory.push({
-        role: session.role,
-        remarks: remarksText || "Approved.",
-        date: new Date().toLocaleDateString()
-    });
-
-    // 2. Find the current step in the chain
-    const currentChainIndex = APPROVAL_CHAIN.findIndex(step => step.role === record.currentApproverRole);
-
-    if (currentChainIndex < APPROVAL_CHAIN.length - 1) {
-        // Move to the next office in the chain
-        const nextStep = APPROVAL_CHAIN[currentChainIndex + 1];
-        record.currentApproverRole = nextStep.role;
-        record.status = nextStep.statusLabel;
-    } else {
-        // RD was the last person; PPMP is officially "Completed"
-        record.status = 'Completed';
-        record.currentApproverRole = 'None';
-        record.approved_at = Date.now();
-        record.approved_by = {
-            name: session.roleName,
-            role: session.role,
-            email: session.email
-        };
-    }
-
-    try {
-        localStorage.setItem('procurement_records', JSON.stringify(db));
-        closeRequestModal();
-        if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
-        showToast(`PPMP forwarded to ${record.currentApproverRole}.`);
-    } catch (err) {
-        console.error("Save failed", err);
-    }
-}
-
-
 // ============================================================
 // REQUIRED FIELD CHECK
 // ============================================================
@@ -2655,7 +2612,7 @@ function loadRecordIntoModal(id, itemIndex = 0) {
     const session = typeof getSession === 'function' ? getSession() : null;
     const finishBtn = document.getElementById('finishBtn');
 
-    if (session && session.canApprove && data.currentApproverRole === session.role) {
+    if (canSessionActOnRecord(data)) {
         document.getElementById('page-title').innerText = "APPROVAL REQUIRED: " + data.ppmp_no;
     
         const remarksField = document.getElementById('remarks');
@@ -2727,7 +2684,7 @@ function updateVerifyButtonLabel() {
 function applyApprovalState(record) {
     const status = getPpmpStatus(record);
     const isLocked = status !== 'Draft';           // submitted or approved: requester can't edit
-    const canApprove = typeof canCurrentUserApprove === 'function' && canCurrentUserApprove();
+    const canApprove = typeof canSessionActOnRecord === 'function' && canSessionActOnRecord(record);
 
     updateStatusBadge(record.status);
     updateVerifyButtonLabel();
@@ -2864,6 +2821,10 @@ function openApprovalDialog() {
         showToast('This PPMP must be submitted for approval before it can be approved.');
         return;
     }
+    if (!canSessionActOnRecord(currentRecord)) {
+        showToast('This PPMP is not waiting for your approval.');
+        return;
+    }
 
     if (!approvalDialogEl) approvalDialogEl = buildApprovalDialog();
 
@@ -2872,9 +2833,14 @@ function openApprovalDialog() {
     const who = session && session.roleName ? session.roleName : 'you';
 
     document.getElementById('approvalTitle').textContent = 'Approve PPMP No. ' + ppmpNo + '?';
-    document.getElementById('approvalDesc').textContent =
-        'This marks the PPMP as Final and closes it. It can no longer be edited, get new items, ' +
-        'or be deleted by the requesting office. The approval will be recorded under ' + who + '.';
+    const stepIdx = APPROVAL_CHAIN.findIndex(step => step.role === currentRecord.currentApproverRole);
+    const isLastStep = stepIdx === APPROVAL_CHAIN.length - 1;
+    const nextStep = !isLastStep && stepIdx > -1 ? APPROVAL_CHAIN[stepIdx + 1] : null;
+    document.getElementById('approvalDesc').textContent = nextStep
+        ? 'This approves the PPMP at your stage and forwards it to the ' + nextStep.label +
+          '. The approval will be recorded under ' + who + '.'
+        : 'This is the final approval. It marks the PPMP as Final and closes it. It can no longer be edited, ' +
+          'get new items, or be deleted by the requesting office. The approval will be recorded under ' + who + '.';
 
     approvalPrevFocus = document.activeElement;
     approvalDialogEl.classList.add('show');
@@ -2895,51 +2861,8 @@ function closeApprovalDialog() {
 
 function approveCurrentPpmp() {
     closeApprovalDialog();
-
-    // Re-check here as well — hiding the button is not the only gate.
-    const session = typeof getSession === 'function' ? getSession() : null;
-    if (!session || !session.canApprove) {
-        showToast('Only an authorized approver can approve a PPMP.');
-        return;
-    }
-    if (!currentEditingId) return;
-
-    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
-    const idx = db.findIndex(r => r.id == currentEditingId);
-    if (idx === -1) return;
-    if (getPpmpStatus(db[idx]) !== 'For Approval') {
-        showToast('This PPMP must be submitted for approval before it can be approved.');
-        return;
-    }
-
-    db[idx].status = 'Completed';
-    db[idx].is_indicative = 'Final';
-    db[idx].approved_at = Date.now();
-    db[idx].approved_by = {
-        name: session.roleName,
-        role: session.role,
-        email: session.email
-    };
-
-    try {
-        localStorage.setItem('procurement_records', JSON.stringify(db));
-    } catch (err) {
-        showToast('Could not save the approval — please try again.');
-        return;
-    }
-
-    // Reflect the change in the still-open modal
-    const indicativeField = document.getElementById('is_indicative');
-    if (indicativeField) indicativeField.value = 'Final';
-    applyApprovalState(db[idx]);
-
-    // Refresh the dashboard behind the modal (stat cards, activity feed,
-    // entries table, notification dot)
-    if (typeof refreshDashboardRecords === 'function') {
-        refreshDashboardRecords();
-    }
-
-    showToast('PPMP No. ' + db[idx].ppmp_no + ' approved and marked Final.');
+    const remarksField = document.getElementById('remarks');
+    performApprovalStep(remarksField ? remarksField.value : '');
 }
 
 // Deletes just the item currently shown in the modal, rather than the
@@ -2989,28 +2912,16 @@ function enableEditMode() {
 }
 
 function disableModalFields() {
-    const session = getCurrentUser();
     const finishBtn = document.getElementById('finishBtn');
-    const remarksField = document.getElementById('remarks');
-    
-    if (session.canApprove && data.currentApproverRole === session.role) {
-        document.getElementById('page-title').innerText = "ACTION REQUIRED: " + data.ppmp_no;
-        
-        // Unlock ONLY the remarks field for the approver to use
-        remarksField.disabled = false;
-        remarksField.style.background = "var(--db-card-alt, #0F172A)";
-        remarksField.placeholder = "Enter approver remarks here before clicking Approve...";
 
-        // Transform the Finish button into an Approve button
-        finishBtn.innerText = "Approve & Forward \u2192";
-        finishBtn.style.background = "var(--db-green, #22C55E)";
-        finishBtn.onclick = () => approveWorkflowStep();
-    } else {
-        // Standard view mode behavior
+    // Read-only view: the Finish button just closes the modal.
+    // (loadRecordIntoModal turns it into "Approve & Forward" for the approver
+    // whose stage the PPMP is currently at.)
+    if (finishBtn) {
         finishBtn.innerText = 'Close';
         finishBtn.onclick = closeRequestModal;
     }
-    
+
     document.querySelectorAll('#requestModalOverlay input, #requestModalOverlay select, #requestModalOverlay textarea')
         .forEach(el => el.disabled = true);
     document.getElementById('uploadZone').style.pointerEvents = 'none';
@@ -3076,73 +2987,84 @@ document.addEventListener('click', function (event) {
     }
 });
 
-function approveWorkflowStep() {
+// ============================================================
+// APPROVAL STEP (single implementation)
+// Called by both the "Approve & Forward" footer button and the header
+// "Approve PPMP" dialog. Moves the PPMP to the next stage of APPROVAL_CHAIN;
+// only the last stage (Regional Director) completes it.
+// ============================================================
+function performApprovalStep(remarksText) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canApprove) {
+        showToast('Only an authorized approver can approve a PPMP.');
+        return;
+    }
+    if (!currentEditingId) return;
+
     const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
     const idx = db.findIndex(r => r.id == currentEditingId);
     if (idx === -1) return;
 
     const record = db[idx];
-    const user = getCurrentUser();
-    const remarksText = document.getElementById('remarks').value;
 
-    // 1. Record the approval and remarks
-    record.approvalHistory.push({
-        role: user.role,
-        remarks: remarksText || "Approved.",
-        date: new Date().toLocaleDateString()
-    });
-
-    // 2. Find next step in chain
-    const currentStepIdx = APPROVAL_CHAIN.findIndex(s => s.role === record.currentStage);
-
-    if (currentStepIdx < APPROVAL_CHAIN.length - 1) {
-        // Move to next office
-        const nextStep = APPROVAL_CHAIN[currentStepIdx + 1];
-        record.currentStage = nextStep.role;
-        record.status = nextStep.statusLabel;
-    } else {
-        // RD was the last step
-        record.status = 'Approved';
-        record.currentStage = 'Finalized';
+    if (getPpmpStatus(record) !== 'For Approval') {
+        showToast('This PPMP must be submitted for approval before it can be approved.');
+        return;
+    }
+    if (!canSessionActOnRecord(record)) {
+        showToast('This PPMP is not waiting for your approval.');
+        return;
     }
 
-    localStorage.setItem('procurement_records', JSON.stringify(db));
-    location.reload(); // Refresh to update dashboard
-}
-
-function approveWorkflowStep() {
-    if (!currentEditingId) return;
-    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
-    const idx = db.findIndex(r => r.id == currentEditingId);
-    if (idx === -1) return;
-
-    const record = db[idx];
-    const session = typeof getSession === 'function' ? getSession() : null;
-
-    // Save remarks
-    if (!record.remarksHistory) record.remarksHistory = [];
+    // 1. Record who approved at this stage, with their remarks
+    if (!Array.isArray(record.remarksHistory)) record.remarksHistory = [];
     record.remarksHistory.push({
+        stage: session.stage,
         role: session.role,
-        remarks: document.getElementById('remarks').value || "Approved.",
-        date: new Date().toLocaleDateString()
+        name: session.roleName,
+        remarks: (remarksText || '').trim() || 'Approved.',
+        date: new Date().toLocaleDateString(),
+        at: Date.now()
     });
 
-    // Sequence logic
-    const currentIdx = APPROVAL_CHAIN.findIndex(s => s.role === record.currentApproverRole);
-    if (currentIdx < APPROVAL_CHAIN.length - 1) {
+    // 2. Advance to the next stage, or complete after the last one
+    const currentIdx = APPROVAL_CHAIN.findIndex(step => step.role === record.currentApproverRole);
+    let message;
+
+    if (currentIdx > -1 && currentIdx < APPROVAL_CHAIN.length - 1) {
         const next = APPROVAL_CHAIN[currentIdx + 1];
-        record.currentApproverRole = next.role;
-        record.status = next.statusLabel;
+        record.currentApproverRole = next.role;      // status stays 'For Approval'
+        message = 'PPMP No. ' + record.ppmp_no + ' approved and forwarded to ' + next.label + '.';
     } else {
-        // RD Approved
         record.status = 'Completed';
         record.currentApproverRole = 'None';
+        record.is_indicative = 'Final';
+        record.approved_at = Date.now();
+        record.approved_by = {
+            name: session.roleName,
+            role: session.role,
+            email: session.email
+        };
+        message = 'PPMP No. ' + record.ppmp_no + ' fully approved and marked Final.';
     }
 
-    localStorage.setItem('procurement_records', JSON.stringify(db));
+    try {
+        localStorage.setItem('procurement_records', JSON.stringify(db));
+    } catch (err) {
+        console.error('Save failed', err);
+        showToast('Could not save the approval - please try again.');
+        return;
+    }
+
     closeRequestModal();
     if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
-    showToast(`Approved and forwarded to ${record.currentApproverRole}`);
+    showToast(message);
+}
+
+// Footer "Approve & Forward" button (approver view).
+function approveWorkflowStep() {
+    const remarksField = document.getElementById('remarks');
+    performApprovalStep(remarksField ? remarksField.value : '');
 }
 
 // ============================================================

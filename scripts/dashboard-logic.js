@@ -6,9 +6,32 @@
 // ============================================================
 
 
+// The first step of the approval chain (see APPROVAL_CHAIN in request-modal.js).
+// Submitting a PPMP hands it to this stage.
+const FIRST_APPROVAL_STAGE = 'HEAD';
+// A PPMP submitted by a Unit Head skips the HEAD step (their submission is
+// their approval) and goes straight to this stage.
+const SECOND_APPROVAL_STAGE = 'TOD';
+
 function getSessionUser() {
-    // Look for the 'currentUser' key set during login
-    return JSON.parse(localStorage.getItem('currentUser')) || { role: 'ILCDB', canApprove: false };
+    return (typeof getSession === 'function' && getSession()) || { role: null, canApprove: false, canRequest: false };
+}
+
+// True when the signed-in account is an approver AND this record is waiting
+// at their stage. Unit heads are additionally limited to their own office.
+// Drafts are never actionable.
+function session_isHead() {
+    const s = typeof getSession === 'function' ? getSession() : null;
+    return !!(s && s.stage === 'HEAD');
+}
+
+function canSessionActOnRecord(record) {
+    const s = typeof getSession === 'function' ? getSession() : null;
+    if (!s || !s.canApprove || !record) return false;
+    if (getPpmpStatus(record) !== 'For Approval') return false;
+    if (record.currentApproverRole !== s.stage) return false;
+    if (s.stage === 'HEAD') return record.end_user === s.headOf;
+    return true;
 }
 
 function getRecords() {
@@ -18,20 +41,27 @@ function getRecords() {
     if (!session) return [];
 
     return allRecords.filter(record => {
-        // 1. If user is ILCDB or FPIAP, they only see PPMPs they created
-        if (session.role === 'ILCDB' || session.role === 'FPIAP') {
-            return record.creatorId === session.id || record.end_user === session.office;
-        }
-
-        // 2. If user is an Approver (Head, TOD, Budget, RD)
-        // They ONLY see it if it is currently at their stage
-        if (session.canApprove && record.currentApproverRole === session.role) {
+        // 1. Requesters see every PPMP that belongs to their office
+        //    (drafts included), whatever stage it is at.
+        if (session.canRequest && record.end_user === session.office) {
             return true;
         }
 
-        // 3. Fully Approved PPMPs (Completed) are visible to all involved offices
+        // 2. Fully approved PPMPs are visible to everyone.
         if (record.status === 'Completed') {
             return true;
+        }
+
+        // 3. Approvers see submitted PPMPs that are waiting at their stage,
+        //    or that they already acted on (so a forwarded PPMP does not
+        //    vanish from their list). Unit heads: own office only.
+        if (session.canApprove && getPpmpStatus(record) === 'For Approval') {
+            if (session.stage === 'HEAD' && record.end_user !== session.headOf) {
+                return false;
+            }
+            if (record.currentApproverRole === session.stage) return true;
+            const history = Array.isArray(record.remarksHistory) ? record.remarksHistory : [];
+            if (history.some(h => h.stage === session.stage)) return true;
         }
 
         return false;
@@ -102,11 +132,12 @@ function isPpmpClosed(record) {
 // ------------------------------------------------------------
 // PPMP status lifecycle:  Draft  ->  For Approval  ->  Completed
 //   Draft         default; only the requesting office sees it, can edit it
-//   For Approval  submitted by the requester; now visible to approvers
-//                 (accounts with canApprove) and locked against edits
-//   Completed     approved (see isPpmpClosed above)
-// Records saved before this existed use the old 'Pending' status, which
-// is treated as Draft.
+//   For Approval  submitted by the requester; locked against edits. It stays
+//                 'For Approval' for the whole chain - record.currentApproverRole
+//                 ('HEAD' -> 'TOD' -> 'BO' -> 'RD') says whose turn it is.
+//   Completed     approved by the last step (see isPpmpClosed above)
+// Records saved before this existed use the old 'Pending ...' statuses, which
+// are treated as Draft.
 // ------------------------------------------------------------
 function getPpmpStatus(record) {
     if (!record) return 'Draft';
@@ -982,7 +1013,8 @@ function openSubmitApprovalDialog(recordId) {
     document.getElementById('submitApprovalTitle').textContent =
         'Submit PPMP No. ' + (record.ppmp_no || 'N/A') + ' for approval?';
     document.getElementById('submitApprovalDesc').textContent =
-        'Its status will change from Draft to For Approval and it becomes visible to approvers. ' +
+        (session_isHead() ? 'Its status will change from Draft to For Approval and it goes straight to the TOD. ' :
+                            'Its status will change from Draft to For Approval and it goes to your Unit Head. ') +
         'While it is under review it can no longer be edited or get new items.';
 
     submitApprovalPrevFocus = document.activeElement;
@@ -1023,6 +1055,22 @@ function confirmSubmitForApproval() {
 
     all[idx].status = 'For Approval';
     all[idx].submitted_at = Date.now();
+
+    if (session.stage === 'HEAD') {
+        // Unit Head submitting for their own unit: counts as the head's approval.
+        all[idx].currentApproverRole = SECOND_APPROVAL_STAGE;
+        if (!Array.isArray(all[idx].remarksHistory)) all[idx].remarksHistory = [];
+        all[idx].remarksHistory.push({
+            stage: 'HEAD',
+            role: session.role,
+            name: session.roleName,
+            remarks: 'Submitted by the Unit Head.',
+            date: new Date().toLocaleDateString(),
+            at: Date.now()
+        });
+    } else {
+        all[idx].currentApproverRole = FIRST_APPROVAL_STAGE;
+    }
     all[idx].submitted_by = {
         name: session.roleName,
         role: session.role,
@@ -1299,7 +1347,7 @@ function refreshDashboardRecords() {
     const notifDot = document.getElementById('notifDot');
     if (notifDot) {
         // Show dot if there are any requests waiting for the current user's approval
-        const pendingCount = records.filter(r => r.status.includes('Pending')).length;
+        const pendingCount = records.filter(canSessionActOnRecord).length;
         notifDot.classList.toggle('hidden', pendingCount === 0);
     }
 }
@@ -1321,7 +1369,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeConfirmModal();
         };
     }
-    if (session.role !== 'ILCDB' && session.role !== 'FPIAP') {
+    if (!session || !session.canRequest) {
         const newRequestButtons = document.querySelectorAll('.db-nav-item[onclick*="openRequestModal"], .db-cta-btn');
         newRequestButtons.forEach(btn => btn.style.display = 'none');
     }

@@ -1,7 +1,18 @@
 // ============================================================
 // DICT PROCUREMENT — AUTH (client-side only, no backend yet)
 //
-// Hardcoded accounts (three offices plus one approver). Each office account's `office` string
+// Hardcoded accounts: requesting offices, unit heads, TOD, Budget Officer, RD.
+//
+// Extra fields used by the approval workflow:
+//   canRequest  - may create PPMPs (requesters)
+//   canApprove  - may approve PPMPs
+//   stage       - which approval step this account acts on:
+//                 'HEAD' -> 'TOD' -> 'BO' -> 'RD'  (must match APPROVAL_CHAIN)
+//   headOf      - HEAD accounts only: the End-User office they approve for
+//                 (a Unit Head also does data entry for, and sees all entries
+//                 of, that same unit, so their `office` is the unit itself)
+//
+// Each requester account's `office` string
 // must exactly match the "End-User or Implementing Unit" value
 // stored on a PPMP record — getRecords() in dashboard-logic.js
 // filters on it, and enableModalFields() in request-modal.js
@@ -15,14 +26,16 @@ const ACCOUNTS = [
         password: 'ILCDB123',
         role: 'ILCDB',
         roleName: 'ILCDB',
-        office: 'ICT Literacy Competency and Development Bureu'
+        office: 'ICT Literacy Competency and Development Bureu',
+        canRequest: true
     },
     {
         email: 'FPIAP@dict.gov.ph',
         password: 'FPIAP123',
         role: 'FPIAP',
         roleName: 'FPIAP',
-        office: 'Free Public Internet Access Program'
+        office: 'Free Public Internet Access Program',
+        canRequest: true
     },
     // Head accounts are the first approvers to be followed by TOD
     {
@@ -30,16 +43,22 @@ const ACCOUNTS = [
         password: 'FPIAPH123',
         role: 'FPIAPH',
         roleName: 'FPIAP Head',
-        office: 'Head of Free Public Internet Access Program',
-        canApprove: true
+        office: 'Free Public Internet Access Program',
+        canRequest: true,
+        canApprove: true,
+        stage: 'HEAD',
+        headOf: 'Free Public Internet Access Program'
     },
     {
         email: 'ILCDBHEAD@dict.gov.ph',
         password: 'ILCDBH123',
         role: 'ILCDBH',
         roleName: 'ILCDB Head',
-        office: 'Head of ICT Literacy Competency and Development Bureu',
-        canApprove: true
+        office: 'ICT Literacy Competency and Development Bureu',
+        canRequest: true,
+        canApprove: true,
+        stage: 'HEAD',
+        headOf: 'ICT Literacy Competency and Development Bureu'
     },
 
     //Next is the TOD, who is the second approver after the heads of the offices
@@ -49,7 +68,8 @@ const ACCOUNTS = [
         role: 'TOD',
         roleName: 'Technical Operations Division',
         office: 'Technical Operations Division',
-        canApprove: true
+        canApprove: true,
+        stage: 'TOD'
     },
 
     //Third is the Budget Officer
@@ -59,7 +79,8 @@ const ACCOUNTS = [
         role: 'BO',
         roleName: 'Budget Officer',
         office: 'Budget Office',
-        canApprove: true
+        canApprove: true,
+        stage: 'BO'
     },
     {
         // Authorized approver. `canApprove` is what unlocks the "Approve
@@ -71,14 +92,16 @@ const ACCOUNTS = [
         password: 'rd123',
         role: 'RD',
         roleName: 'Regional Director',
-        canApprove: true
+        canApprove: true,
+        stage: 'RD'
     },
     {
         email: 'test@dict.gov.ph',
         password: 'test123',
         role: 'POP',
         roleName: 'POP (Test Account)',
-        office: 'POP Test Office'
+        office: 'POP Test Office',
+        canRequest: true
     },
 ];
 
@@ -100,11 +123,15 @@ function getSession() {
 
 function setSession(account) {
     localStorage.setItem('dashboard_session', JSON.stringify({
+        id: account.email.toLowerCase(),
         email: account.email,
         role: account.role,
         roleName: account.roleName,
         office: account.office,
-        canApprove: !!account.canApprove
+        canApprove: !!account.canApprove,
+        canRequest: !!account.canRequest,
+        stage: account.stage || null,
+        headOf: account.headOf || null
     }));
 }
 
