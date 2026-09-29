@@ -12,28 +12,30 @@ function getSessionUser() {
 }
 
 function getRecords() {
-    // 1. Get all raw data
     const allRecords = JSON.parse(localStorage.getItem('procurement_records')) || [];
-    
-    // 2. Get current user session
-    const user = getSessionUser(); // Function we added to request-modal.js or define it here
+    const session = typeof getSession === 'function' ? getSession() : null;
 
-    // 3. Filter the records based on the Approval Workflow
-    const visibleRecords = allRecords.filter(req => {
-        // Condition A: If I am the creator (ILCDB/FPIAP), I see my own requests always
-        if (user.role === 'ILCDB' || user.role === 'FPIAP') return true;
+    if (!session) return [];
 
-        // Condition B: If I am the current required approver, I see it
-        if (user.canApprove && req.currentApproverRole === user.role) return true;
+    return allRecords.filter(record => {
+        // 1. If user is ILCDB or FPIAP, they only see PPMPs they created
+        if (session.role === 'ILCDB' || session.role === 'FPIAP') {
+            return record.creatorId === session.id || record.end_user === session.office;
+        }
 
-        // Condition C: If the project is fully Approved, everyone can see it for transparency
-        if (req.status === 'Completed' || req.status === 'Approved') return true;
+        // 2. If user is an Approver (Head, TOD, Budget, RD)
+        // They ONLY see it if it is currently at their stage
+        if (session.canApprove && record.currentApproverRole === session.role) {
+            return true;
+        }
+
+        // 3. Fully Approved PPMPs (Completed) are visible to all involved offices
+        if (record.status === 'Completed') {
+            return true;
+        }
 
         return false;
     });
-
-    // THE FIX: You must return the filtered list so the dashboard uses it!
-    return visibleRecords;
 }
 
 
@@ -1287,11 +1289,11 @@ function closeConfirmModal() {
 function refreshDashboardRecords() {
     const records = getRecords(); // This uses the filtered logic from our previous step
 
-    // Update the Summary Cards
-    renderStats(records);
-
-    // Update the Activity List
-    renderActivity(records);
+    if (typeof renderStats === 'function') renderStats(records);
+    if (typeof renderActivity === 'function') renderActivity(records);
+    
+    // If we are on the entries.html page, this will update the table there too
+    if (typeof renderEntriesTable === 'function') renderEntriesTable(records);
 
     // Update the Notification Dot
     const notifDot = document.getElementById('notifDot');
@@ -1304,6 +1306,7 @@ function refreshDashboardRecords() {
 
 // 3. Event Listener for the actual "Delete" button inside the popup
 document.addEventListener('DOMContentLoaded', function() {
+    const session = getSession();
     const confirmBtn = document.getElementById('confirmDeleteBtn');
     if (confirmBtn) {
         confirmBtn.onclick = function() {
@@ -1318,6 +1321,12 @@ document.addEventListener('DOMContentLoaded', function() {
             closeConfirmModal();
         };
     }
+    if (session.role !== 'ILCDB' && session.role !== 'FPIAP') {
+        const newRequestButtons = document.querySelectorAll('.db-nav-item[onclick*="openRequestModal"], .db-cta-btn');
+        newRequestButtons.forEach(btn => btn.style.display = 'none');
+    }
+    
+    refreshDashboardRecords();
 });
 
 // 4. The actual whole-record deletion logic

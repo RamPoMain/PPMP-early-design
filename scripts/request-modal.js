@@ -699,9 +699,13 @@ function saveProcurementRequest() {
             approvalHistory: [],
         };
     } else {
+
+        const session = typeof getSession === 'function' ? getSession() : null;
         // Brand-new PPMP, with this as its first line item.
         entry = {
             id: Date.now(),
+
+            creatorId: session ? session.id : null,
 
             ppmp_no:
                 document.getElementById('ppmp_no').value || 'N/A',
@@ -718,8 +722,9 @@ function saveProcurementRequest() {
             items: [itemPayload],
 
             status: 'Pending Unit Head Approval', // Initial status
-            currentStage: 'Unit Head',           // Who needs to see it next
-            approvalHistory: [],
+            currentApproverRole: 'Unit Head',      // Points to the first approver
+            remarksHistory: [],
+            date: new Date().toLocaleDateString()
         };
     }
 
@@ -2647,6 +2652,21 @@ function loadRecordIntoModal(id, itemIndex = 0) {
     // Disable all inputs so it's "Read Only"
     disableModalFields();
 
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const finishBtn = document.getElementById('finishBtn');
+
+    if (session && session.canApprove && data.currentApproverRole === session.role) {
+        document.getElementById('page-title').innerText = "APPROVAL REQUIRED: " + data.ppmp_no;
+    
+        const remarksField = document.getElementById('remarks');
+        remarksField.disabled = false;
+        remarksField.style.background = "var(--db-card-alt, #0F172A)";
+
+        finishBtn.innerText = "Approve & Forward \u2192";
+        finishBtn.style.background = "var(--db-green, #22C55E)";
+        finishBtn.onclick = () => approveWorkflowStep();
+    }
+
     // Status badge, approval banner, and which action buttons apply.
     // A closed (approved) PPMP is read-only: no Edit, no Delete Item.
     const statusBadge = document.getElementById('modalStatusBadge');
@@ -3088,6 +3108,41 @@ function approveWorkflowStep() {
 
     localStorage.setItem('procurement_records', JSON.stringify(db));
     location.reload(); // Refresh to update dashboard
+}
+
+function approveWorkflowStep() {
+    if (!currentEditingId) return;
+    const db = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const idx = db.findIndex(r => r.id == currentEditingId);
+    if (idx === -1) return;
+
+    const record = db[idx];
+    const session = typeof getSession === 'function' ? getSession() : null;
+
+    // Save remarks
+    if (!record.remarksHistory) record.remarksHistory = [];
+    record.remarksHistory.push({
+        role: session.role,
+        remarks: document.getElementById('remarks').value || "Approved.",
+        date: new Date().toLocaleDateString()
+    });
+
+    // Sequence logic
+    const currentIdx = APPROVAL_CHAIN.findIndex(s => s.role === record.currentApproverRole);
+    if (currentIdx < APPROVAL_CHAIN.length - 1) {
+        const next = APPROVAL_CHAIN[currentIdx + 1];
+        record.currentApproverRole = next.role;
+        record.status = next.statusLabel;
+    } else {
+        // RD Approved
+        record.status = 'Completed';
+        record.currentApproverRole = 'None';
+    }
+
+    localStorage.setItem('procurement_records', JSON.stringify(db));
+    closeRequestModal();
+    if (typeof refreshDashboardRecords === 'function') refreshDashboardRecords();
+    showToast(`Approved and forwarded to ${record.currentApproverRole}`);
 }
 
 // ============================================================
