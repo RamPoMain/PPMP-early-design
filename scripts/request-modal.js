@@ -571,6 +571,18 @@ function saveProcurementRequest() {
     // Belt-and-suspenders: re-verify mode/budget compliance in case the
     // form was reached without passing through the normal step flow.
     if (!validateModeBudgetMatch()) {
+        showStep1(); // Bring user back to Step 1/2 to see the budget/mode error
+        showToast('Please check the Mode of Procurement and Budget match.');
+        return;
+    }
+
+    if (typeof validateDeliveryDateMatch === 'function' && !validateDeliveryDateMatch()) {
+        showStep2(); // Bring user back to Step 2 to see the date error
+        showToast('Please check the End Date and Delivery Period.');
+        return;
+    }
+
+    if (!validateStep('form-step-3')) {
         return;
     }
 
@@ -1244,114 +1256,76 @@ function validateModeBudgetMatch() {
 
 function validateDates(container) {
 
-    const startGroup =
-        getFieldGroup(
-            'start_date'
-        );
+    const startGroup = getFieldGroup('start_date');
+    const endGroup = getFieldGroup('end_date');
+    const deliveryGroup = getFieldGroup('delivery_period');
 
-    const endGroup =
-        getFieldGroup(
-            'end_date'
-        );
-
-
-    if (!startGroup || !endGroup) {
+    if (!startGroup || !endGroup || !deliveryGroup) {
         return true;
     }
 
+    const startInput = startGroup.querySelector('input');
+    const endInput = endGroup.querySelector('input');
+    const deliveryInput = deliveryGroup.querySelector('input');
 
-    const startInput =
-        startGroup.querySelector(
-            'input'
-        );
-
-    const endInput =
-        endGroup.querySelector(
-            'input'
-        );
-
-
-    if (!startInput || !endInput) {
+    if (!startInput || !endInput || !deliveryInput) {
         return true;
     }
 
-
-    const startDate =
-        startInput.value;
-
-    const endDate =
-        endInput.value;
-
+    const startDate = startInput.value;
+    const endDate = endInput.value;
+    const deliveryDate = deliveryInput.value;
 
     let valid = true;
 
-
-    // Start date
+    // Start date check
     if (!startDate) {
-
-        showFieldError(
-            'start_date',
-            'Please select a start date.'
-        );
-
+        showFieldError('start_date', 'Please select a start date.');
         valid = false;
-
     } else {
-
-        clearFieldError(
-            'start_date'
-        );
+        clearFieldError('start_date');
     }
 
-
-    // End date
+    // End date check
     if (!endDate) {
-
-        showFieldError(
-            'end_date',
-            'Please select an end date.'
-        );
-
+        showFieldError('end_date', 'Please select an end date.');
         valid = false;
-
     } else {
-
-        clearFieldError(
-            'end_date'
-        );
+        clearFieldError('end_date');
     }
 
+    // Delivery period check
+    if (!deliveryDate) {
+        showFieldError('delivery_period', 'Please specify the expected delivery/implementation period.');
+        valid = false;
+    } else {
+        clearFieldError('delivery_period');
+    }
 
-    // Compare dates
-    if (
-        startDate &&
-        endDate
-    ) {
+    // Compare Start Date vs. End Date
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
 
-        const start =
-            new Date(
-                startDate
-            );
-
-        const end =
-            new Date(
-                endDate
-            );
-
-
-        if (
-            end < start
-        ) {
-
-            showFieldError(
-                'end_date',
-                'End date cannot be earlier than the start date.'
-            );
-
+        if (end < start) {
+            showFieldError('end_date', 'End date cannot be earlier than the start date.');
             valid = false;
         }
     }
 
+    // Compare End Date vs. Expected Delivery Period
+    if (endDate && deliveryDate) {
+        const end = new Date(endDate);
+        const delivery = new Date(deliveryDate);
+
+        if (delivery <= end) {
+            showFieldError(
+                'delivery_period',
+                'Expected delivery/implementation period cannot be on or before the end of procurement activity.'
+            );
+            valid = false;
+        }
+    }
 
     return valid;
 }
@@ -1435,6 +1409,37 @@ function validateStep(containerId) {
     return allValid;
 }
 
+function validateDeliveryDateMatch() {
+    const endGroup = getFieldGroup('end_date');
+    const deliveryGroup = getFieldGroup('delivery_period');
+
+    if (!endGroup || !deliveryGroup) return true;
+
+    const endInput = endGroup.querySelector('input');
+    const deliveryInput = deliveryGroup.querySelector('input');
+
+    if (!endInput || !deliveryInput) return true;
+
+    const endDate = endInput.value;
+    const deliveryDate = deliveryInput.value;
+
+    // Only compare when both dates have been selected
+    if (!endDate || !deliveryDate) return true;
+
+    const end = new Date(endDate);
+    const delivery = new Date(deliveryDate);
+
+    if (delivery <= end) {
+        showFieldError(
+            'delivery_period',
+            'Expected delivery/implementation period cannot be on or before the end of procurement activity.'
+        );
+        return false;
+    }
+
+    clearFieldError('delivery_period');
+    return true;
+}
 
 // ============================================================
 // VALIDATE AND PROCEED
@@ -1541,6 +1546,9 @@ function initRequiredFieldValidation() {
 
                 validateModeBudgetMatch();
             }
+            if (fieldValid && (fieldName === 'end_date' || fieldName === 'delivery_period')) {
+            validateDeliveryDateMatch();
+            }
         }
     );
 
@@ -1578,6 +1586,9 @@ function initRequiredFieldValidation() {
             ) {
 
                 validateModeBudgetMatch();
+            }
+            if (fieldValid && (fieldName === 'end_date' || fieldName === 'delivery_period')) {
+                validateDeliveryDateMatch();
             }
         }
     );
@@ -2402,6 +2413,12 @@ function resetRequestForm() {
     if (statusBadge) statusBadge.classList.add('hidden');
     hideApprovalInfo();
 
+    const finishBtn = document.getElementById('finishBtn');
+    if (finishBtn) {
+        finishBtn.innerText = 'Finish →';
+        finishBtn.onclick = saveProcurementRequest;
+    }
+
     const pdfButtons = document.querySelectorAll('.pdf-btn-global');
     pdfButtons.forEach(btn => btn.style.display = 'none');
 
@@ -2483,6 +2500,12 @@ function addEntryToPpmp(ppmpNo) {
     if (indicativeField) {
         indicativeField.value = (groupRecord && groupRecord.is_indicative) || '';
         indicativeField.disabled = true;
+    }
+
+    const finishBtn = document.getElementById('finishBtn');
+    if (finishBtn) {
+        finishBtn.innerText = 'Finish →';
+        finishBtn.onclick = saveProcurementRequest;
     }
 
     hideItemNavigator();
@@ -3064,7 +3087,10 @@ function enableEditMode() {
 
     // finishBtn only exists on step 3 — guard in case we're on step 1/2
     const finishBtn = document.getElementById('finishBtn');
-    if (finishBtn) finishBtn.innerText = 'Save Changes →';
+    if (finishBtn) {
+        finishBtn.innerText = 'Save Changes →';
+        finishBtn.onclick = saveProcurementRequest;
+    }
 
     showToast('You can now edit this request.');
 }
