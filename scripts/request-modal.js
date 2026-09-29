@@ -691,27 +691,13 @@ function saveProcurementRequest() {
             isNewItem = true;
         }
 
-        entry = {
-            id: existingRecord.id,
-
-            ppmp_no:
-                document.getElementById('ppmp_no').value || existingRecord.ppmp_no || 'N/A',
-
-            is_indicative:
-                document.getElementById('is_indicative').value || existingRecord.is_indicative,
-
-            end_user:
-                document.getElementById('end_user').value || existingRecord.end_user || 'N/A',
-
-            fiscal_year:
-                document.getElementById('fiscal_year').value || existingRecord.fiscal_year,
-
-            items: items,
-
-            status: 'Pending Unit Head Approval', // Initial status
-            currentStage: 'Unit Head',           // Who needs to see it next
-            approvalHistory: [],
-        };
+    entry = Object.assign({}, existingRecord, {
+        ppmp_no:       document.getElementById('ppmp_no').value || existingRecord.ppmp_no || 'N/A',
+        is_indicative: document.getElementById('is_indicative').value || existingRecord.is_indicative,
+        end_user:      document.getElementById('end_user').value || existingRecord.end_user || 'N/A',
+        fiscal_year:   document.getElementById('fiscal_year').value || existingRecord.fiscal_year,
+        items:         items
+});
     } else {
 
         const session = typeof getSession === 'function' ? getSession() : null;
@@ -1221,6 +1207,14 @@ function validateModeBudgetMatch() {
         return true;
     }
 
+    const isBracketMode =
+        MODE_BUDGET_BRACKETS.some(tier => tier.mode === modeValue);
+
+    if (!isBracketMode) {
+        clearFieldError('modeOfProcurement');
+        clearFieldError('budget');
+        return true;
+}
     const recommended =
         getRecommendedMode(budgetNumber);
 
