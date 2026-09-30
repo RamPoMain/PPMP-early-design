@@ -229,6 +229,7 @@ function getRecordItems(record) {
         project_type: record.project_type,
         mode: record.mode,
         pre_procurement: record.pre_procurement,
+        bid_evaluation_criteria: record.bid_evaluation_criteria || '',
         quantity_size: record.quantity_size,
         start_date: record.start_date,
         end_date: record.end_date,
@@ -267,6 +268,14 @@ function getRecordProjectTypeSummary(record) {
 
     if (types.length === 0) return 'N/A';
     if (types.length === 1) return types[0];
+    return 'Mixed';
+}
+
+function getRecordCriteriaSummary(record) {
+    const items = getRecordItems(record);
+    const list = [...new Set(items.map(it => it.bid_evaluation_criteria).filter(Boolean))];
+    if (list.length === 0) return 'N/A';
+    if (list.length === 1) return list[0];
     return 'Mixed';
 }
 
@@ -414,6 +423,13 @@ const PREVIEW_MODE_GROUPS = [
         'Small Value Procurement (SVP)', 'Direct Acquisition', 'Competitive Dialogue',
         'Negotiated Procurement'
     ] }
+];
+
+const PREVIEW_CRITERIA_OPTIONS = [
+    'Lowest Calculated Responsive Bid (LCRB)',
+    'Most Economically Advantageous Responsive Bid (MEARB)',
+    'Most Advantageous Responsive Bid (MARB) / HRRB / SRRB',
+    'Lowest Comparative or Competitive Responsive Bid (LCCRB)'
 ];
 
 const PREVIEW_STRATEGY_OPTIONS = [
@@ -567,52 +583,104 @@ function selectOptionsHtml(options, current) {
 function buildEditableItemRow(record, item) {
     const rid = Number(record.id);
     const iid = item.id;
-    const field = (name, html) => html; // no-op, keeps call sites readable below
 
     const modeOptionsHtml = PREVIEW_MODE_GROUPS.map(group =>
         `<optgroup label="${escapeHtml(group.label)}">${selectOptionsHtml(group.options, item.mode)}</optgroup>`
     ).join('');
 
-    const strategiesHtml = PREVIEW_STRATEGY_OPTIONS.map(opt => `
-        <label class="ep-strategy-opt">
-            <input type="checkbox" value="${escapeHtml(opt)}" data-record-id="${rid}" data-item-id="${iid}"
-                ${(Array.isArray(item.strategies) && item.strategies.includes(opt)) ? 'checked' : ''}
-                onchange="onPreviewStrategyToggle(this)">
-            <span>${escapeHtml(opt)}</span>
-        </label>
-    `).join('');
+    const strategiesHtml = PREVIEW_STRATEGY_OPTIONS.map(opt => {
+        const isChecked = Array.isArray(item.strategies) && item.strategies.includes(opt);
+        return `
+            <label class="ep-strategy-opt" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 8px !important; margin: 4px 0 !important; cursor: pointer !important; width: 100% !important;">
+                <input type="checkbox" value="${escapeHtml(opt)}" data-record-id="${rid}" data-item-id="${iid}"
+                    ${isChecked ? 'checked' : ''}
+                    onchange="onPreviewStrategyToggle(this)"
+                    style="width: 15px !important; height: 15px !important; min-width: 15px !important; max-width: 15px !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; cursor: pointer !important; appearance: auto !important; -webkit-appearance: checkbox !important;">
+                <span style="flex: 1 1 auto !important; color: #111827 !important; font-size: 10.5px !important; line-height: 1.25 !important; white-space: normal !important; word-break: normal !important; text-align: left !important; font-weight: normal !important;">
+                    ${escapeHtml(opt)}
+                </span>
+            </label>
+        `;
+    }).join('');
+
+    const docsDisplay = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
+        ? item.supporting_documents.map(d => escapeHtml(d.name || 'Document')).join(', ')
+        : 'None';
 
     return `
-                        <tr data-preview-item-row="${iid}">
-                            <td>${field('project_description', `<textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="project_description" oninput="onPreviewFieldInput(this)" placeholder="Describe the project...">${escapeHtml(item.project_description || '')}</textarea>`)}</td>
-                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="project_type" onchange="onPreviewFieldInput(this)">
-                                <option value=""${!item.project_type ? ' selected' : ''}>Select...</option>
-                                ${selectOptionsHtml(PREVIEW_PROJECT_TYPES, item.project_type)}
-                            </select></td>
-                            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="quantity_size" oninput="onPreviewFieldInput(this)" placeholder="Quantity and size...">${escapeHtml(item.quantity_size || '')}</textarea></td>
-                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="mode" onchange="onPreviewFieldInput(this)">
-                                <option value=""${!item.mode ? ' selected' : ''}>Select mode...</option>
-                                ${modeOptionsHtml}
-                            </select></td>
-                            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="pre_procurement" onchange="onPreviewFieldInput(this)">
-                                <option value=""${!item.pre_procurement ? ' selected' : ''}>Select...</option>
-                                ${selectOptionsHtml(['No', 'Yes'], item.pre_procurement)}
-                            </select></td>
-                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="start_date" value="${escapeHtml(item.start_date || '')}" oninput="onPreviewFieldInput(this)"></td>
-                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="end_date" value="${escapeHtml(item.end_date || '')}" oninput="onPreviewFieldInput(this)"></td>
-                            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="delivery_period" value="${escapeHtml(item.delivery_period || '')}" oninput="onPreviewFieldInput(this)"></td>
-                            <td><input type="text" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="fund_source" value="${escapeHtml(item.fund_source || '')}" oninput="onPreviewFieldInput(this)" placeholder="Source of funds"></td>
-                            <td><input type="text" class="ep-input ep-budget" data-record-id="${rid}" data-item-id="${iid}" data-field="budget" value="${escapeHtml(item.budget || '')}" oninput="onPreviewFieldInput(this)" placeholder="0.00"></td>
-                            <td><div class="ep-strategies-box" data-record-id="${rid}" data-item-id="${iid}">${strategiesHtml}</div></td>
-                            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="remarks" oninput="onPreviewFieldInput(this)" placeholder="Remarks">${escapeHtml(item.remarks || '')}</textarea></td>
-                            <td class="ep-remove-cell">
-                                <button type="button" class="ep-remove-btn" title="Remove this item" onclick="removePreviewItem(${rid}, ${iid})">
-                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6L18 18M18 6L6 18" stroke-linecap="round"/></svg>
-                                </button>
-                            </td>
-                        </tr>
+        <tr data-preview-item-row="${iid}">
+            <!-- Col 1: Description -->
+            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="project_description" oninput="onPreviewFieldInput(this)" placeholder="Describe the project...">${escapeHtml(item.project_description || '')}</textarea></td>
+            
+            <!-- Col 2: Project Type -->
+            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="project_type" onchange="onPreviewFieldInput(this)">
+                <option value=""${!item.project_type ? ' selected' : ''}>Select...</option>
+                ${selectOptionsHtml(PREVIEW_PROJECT_TYPES, item.project_type)}
+            </select></td>
+            
+            <!-- Col 3: Quantity & Size -->
+            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="quantity_size" oninput="onPreviewFieldInput(this)" placeholder="Quantity and size...">${escapeHtml(item.quantity_size || '')}</textarea></td>
+            
+            <!-- Col 4: Mode of Procurement -->
+            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="mode" onchange="onPreviewFieldInput(this)">
+                <option value=""${!item.mode ? ' selected' : ''}>Select mode...</option>
+                ${modeOptionsHtml}
+            </select></td>
+            
+            <!-- Col 5: Pre-Procurement -->
+            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="pre_procurement" onchange="onPreviewFieldInput(this)">
+                <option value=""${!item.pre_procurement ? ' selected' : ''}>Select...</option>
+                ${selectOptionsHtml(['No', 'Yes'], item.pre_procurement)}
+            </select></td>
+            
+            <!-- Col 6: Criteria for Bid Evaluation -->
+            <td><select class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="bid_evaluation_criteria" onchange="onPreviewFieldInput(this)">
+                <option value=""${!item.bid_evaluation_criteria ? ' selected' : ''}>Select...</option>
+                ${selectOptionsHtml(PREVIEW_CRITERIA_OPTIONS, item.bid_evaluation_criteria)}
+            </select></td>
+            
+            <!-- Col 7: Start Date -->
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="start_date" value="${escapeHtml(item.start_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+            
+            <!-- Col 8: End Date -->
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="end_date" value="${escapeHtml(item.end_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+            
+            <!-- Col 9: Delivery Period -->
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="delivery_period" value="${escapeHtml(item.delivery_period || '')}" oninput="onPreviewFieldInput(this)"></td>
+            
+            <!-- Col 10: Fund Source -->
+            <td><input type="text" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="fund_source" value="${escapeHtml(item.fund_source || '')}" oninput="onPreviewFieldInput(this)" placeholder="Source of funds"></td>
+            
+            <!-- Col 11: Budget -->
+            <td><input type="text" class="ep-input ep-budget" data-record-id="${rid}" data-item-id="${iid}" data-field="budget" value="${escapeHtml(item.budget || '')}" oninput="onPreviewFieldInput(this)" placeholder="0.00"></td>
+            
+            <!-- Col 12: Procurement Strategies & Tools -->
+            <td style="min-width: 220px; width: 220px; vertical-align: top;">
+                <div class="ep-strategies-box" data-record-id="${rid}" data-item-id="${iid}" style="min-width: 210px; width: 100%; max-height: 110px; overflow-y: auto; overflow-x: hidden; padding: 6px 8px; background: #fff; border: 1px solid #c7c7c7; border-radius: 4px; box-sizing: border-box;">
+                    ${strategiesHtml}
+                </div>
+            </td>
+            
+            <!-- Col 13: Attached Supporting Documents -->
+            <td style="min-width: 140px; width: 140px;">
+                <div style="font-size: 10.5px; line-height: 1.4; word-break: break-word; color: #374151;">
+                    ${docsDisplay}
+                </div>
+            </td>
+            
+            <!-- Col 14: Remarks -->
+            <td><textarea class="ep-input" rows="2" data-record-id="${rid}" data-item-id="${iid}" data-field="remarks" oninput="onPreviewFieldInput(this)" placeholder="Remarks">${escapeHtml(item.remarks || '')}</textarea></td>
+            
+            <!-- Col 15: Actions (Remove) -->
+            <td class="ep-remove-cell">
+                <button type="button" class="ep-remove-btn" title="Remove this item" onclick="removePreviewItem(${rid}, ${iid})">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6L18 18M18 6L6 18" stroke-linecap="round"/></svg>
+                </button>
+            </td>
+        </tr>
     `;
 }
+
 
 function buildExcelPreviewMarkup(record, editable) {
     const isIndicative = record.is_indicative === 'Indicative';
@@ -625,25 +693,31 @@ function buildExcelPreviewMarkup(record, editable) {
     const itemRows = editable
         ? items.map(item => buildEditableItemRow(record, item)).join('')
         : items.map(item => {
-        const itemStrategies = Array.isArray(item.strategies)
+        const itemStrategies = Array.isArray(item.strategies) && item.strategies.length > 0
             ? item.strategies.join(', ')
-            : item.strategies || '';
+            : (item.strategies || 'None');
+
+        const attachedDocs = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
+            ? item.supporting_documents.map(doc => doc.name || 'Document').join(', ')
+            : 'None';
 
         return `
-                        <tr>
-                            <td>${escapeHtml(item.project_description || '')}</td>
-                            <td>${escapeHtml(item.project_type || '')}</td>
-                            <td>${escapeHtml(item.quantity_size || '')}</td>
-                            <td>${escapeHtml(item.mode || '')}</td>
-                            <td>${escapeHtml(item.pre_procurement || '')}</td>
-                            <td>${escapeHtml(item.start_date || '')}</td>
-                            <td>${escapeHtml(item.end_date || '')}</td>
-                            <td>${escapeHtml(item.delivery_period || '')}</td>
-                            <td>${escapeHtml(item.fund_source || '')}</td>
-                            <td>${escapeHtml(formatPesoExact(parseBudgetNumber(item.budget)))}</td>
-                            <td>${escapeHtml(itemStrategies)}</td>
-                            <td>${escapeHtml(item.remarks || '')}</td>
-                        </tr>
+            <tr>
+                <td>${escapeHtml(item.project_description || '')}</td>
+                <td>${escapeHtml(item.project_type || '')}</td>
+                <td>${escapeHtml(item.quantity_size || '')}</td>
+                <td>${escapeHtml(item.mode || '')}</td>
+                <td>${escapeHtml(item.pre_procurement || '')}</td>
+                <td>${escapeHtml(item.bid_evaluation_criteria || 'N/A')}</td>
+                <td>${escapeHtml(item.start_date || '')}</td>
+                <td>${escapeHtml(item.end_date || '')}</td>
+                <td>${escapeHtml(item.delivery_period || '')}</td>
+                <td>${escapeHtml(item.fund_source || '')}</td>
+                <td>${escapeHtml(formatPesoExact(parseBudgetNumber(item.budget)))}</td>
+                <td>${escapeHtml(itemStrategies)}</td>
+                <td>${escapeHtml(attachedDocs)}</td>
+                <td>${escapeHtml(item.remarks || '')}</td>
+            </tr>
         `;
     }).join('');
 
@@ -669,9 +743,10 @@ function buildExcelPreviewMarkup(record, editable) {
                 <table class="excel-preview-table">
                     <thead>
                         <tr>
-                            <th colspan="5">PROCUREMENT PROJECT DETAILS</th>
+                            <th colspan="6">PROCUREMENT PROJECT DETAILS</th>
                             <th colspan="3">PROJECTED TIMELINE (MM/YYYY)</th>
                             <th colspan="2">FUNDING DETAILS</th>
+                            <th rowspan="2">PROCUREMENT STRATEGIES AND TOOLS</th>
                             <th rowspan="2">ATTACHED SUPPORTING DOCUMENTS</th>
                             <th rowspan="2">REMARKS</th>
                             ${editable ? '<th rowspan="2">Actions</th>' : ''}
@@ -682,6 +757,7 @@ function buildExcelPreviewMarkup(record, editable) {
                             <th>Quantity and Size of the Project to be Procured</th>
                             <th>Recommended Mode of Procurement</th>
                             <th>Pre-Procurement Conference (Yes/No)</th>
+                            <th>Criteria for Bid Evaluation</th>
                             <th>Start of Procurement Activity</th>
                             <th>End of Procurement Activity</th>
                             <th>Expected Delivery/ Implementation Period</th>
@@ -701,21 +777,24 @@ function buildExcelPreviewMarkup(record, editable) {
                             <th>Column 10</th>
                             <th>Column 11</th>
                             <th>Column 12</th>
+                            <th>Column 13</th>
+                            <th>Column 14</th>
                             ${editable ? '<th></th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
                         ${itemRows}
                         <tr>
-                            <td colspan="9" class="excel-total-label">TOTAL BUDGET:</td>
+                            <td colspan="10" class="excel-total-label">TOTAL BUDGET:</td>
                             <td class="excel-total-value">${escapeHtml(formattedTotal)}</td>
+                            <td></td>
                             <td></td>
                             <td></td>
                             ${editable ? '<td></td>' : ''}
                         </tr>
                         ${editable ? `
                         <tr class="ep-add-row">
-                            <td colspan="13">
+                            <td colspan="15">
                                 <button type="button" class="ep-add-btn" onclick="addItemViaRequestModal(${Number(record.id)})">
                                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5V19M5 12H19" stroke-linecap="round"/></svg>
                                     Add Item
@@ -1262,6 +1341,7 @@ function renderEntries(records) {
                 <td class="db-entry-description">${escapeHtml(description)}</td>
                 <td>${escapeHtml(record.end_user || 'N/A')}</td>
                 <td>${escapeHtml(getRecordProjectTypeSummary(record))}</td>
+                <td>${escapeHtml(getRecordCriteriaSummary(record))}</td>
                 <td>${escapeHtml(budget)}</td>
                 <td>${renderStatusPill(record, submittedTitle)}</td>
                 <td>${ppmpType === 'N/A' ? 'N/A' : `<span class="db-status-pill ${ppmpType === 'Final' ? 'is-type-final' : 'is-type-indicative'}">${ppmpType}</span>`}</td>
@@ -1269,7 +1349,7 @@ function renderEntries(records) {
             </tr>
             ${isExpanded ? `
             <tr class="db-entry-expand-row">
-                <td colspan="9">
+                <td colspan="10">
                     <div class="db-entry-expand-inner">
                         ${buildPreviewToolbarHtml(Number(record.id), { record: record, canEdit: isEditable })}
                         ${buildExcelPreviewMarkup(record, isEditing)}

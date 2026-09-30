@@ -628,6 +628,13 @@ function saveProcurementRequest() {
                 'pre_procurement'
             ).value,
 
+        bid_evaluation_criteria:
+            document.getElementById(
+                'bid_evaluation_criteria')
+                ? document.getElementById(
+                    'bid_evaluation_criteria'
+                ).value : '',
+
         quantity_size:
             document.getElementById(
                 'quantity_size'
@@ -2600,6 +2607,7 @@ function loadRecordIntoModal(id, itemIndex = 0) {
         'project_type': item.project_type,
         'modeOfProcurement': item.mode,
         'pre_procurement': item.pre_procurement,
+        'bid_evaluation_criteria': item.bid_evaluation_criteria,
         'quantity_size': item.quantity_size,
         'start_date': item.start_date,
         'end_date': item.end_date,
@@ -3325,5 +3333,13 @@ document.addEventListener(
             projectTypeEl.addEventListener('change', updateDocTypeHint);
         }
         updateDocTypeHint();
+
+        const criteriaSelect = document.getElementById('bid_evaluation_criteria');
+        const mearbHint = document.getElementById('mearbHint');
+        if (criteriaSelect && mearbHint) {
+            criteriaSelect.addEventListener('change', function () {
+                mearbHint.classList.toggle('hidden', !this.value.includes('MEARB'));
+            });
+        }
     }
 );

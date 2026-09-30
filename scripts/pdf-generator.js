@@ -52,6 +52,7 @@ async function generatePPMP_PDF() {
             quantity_size: getVal('quantity_size'),
             mode: getVal('modeOfProcurement'),
             pre_procurement: getVal('pre_procurement'),
+            bid_evaluation_criteria: getVal('bid_evaluation_criteria'),
             start_date: getVal('start_date'),
             end_date: getVal('end_date'),
             delivery_period: getVal('delivery_period'),
@@ -118,53 +119,62 @@ async function generatePPMP_PDF() {
 
     const headers = [
         [
-            { content: 'PROCUREMENT PROJECT DETAILS', colSpan: 5, styles: { halign: 'center' } },
+            { content: 'PROCUREMENT PROJECT DETAILS', colSpan: 6, styles: { halign: 'center' } },
             { content: 'PROJECTED TIMELINE (MM/YYYY)', colSpan: 3, styles: { halign: 'center' } },
             { content: 'FUNDING DETAILS', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'PROCUREMENT STRATEGIES AND TOOLS', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
             { content: 'ATTACHED SUPPORTING DOCUMENTS', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
             { content: 'REMARKS', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
         ],
         [
-            'General Description and Objective of the Project to be Procured', // Col 1
-            'Type of the Project to be Procured', // Col 2
-            'Quantity and Size of the Project to be Procured', // Col 3
-            'Recommended Mode of Procurement', // Col 4
-            'Pre-Procurement Conference (Yes/No)', // Col 5
-            'Start of Procurement Activity', // Col 6
-            'End of Procurement Activity', // Col 7
-            'Expected Delivery/ Implementation Period', // Col 8
-            'Source of Funds', // Col 9
-            'Estimated Budget / Authorized Budgetary Allocation (PhP)' // Col 10
+            'General Description and Objective of the Project to be Procured',
+            'Type of the Project to be Procured',
+            'Quantity and Size of the Project to be Procured',
+            'Recommended Mode of Procurement',
+            'Pre-Procurement Conference (Yes/No)',
+            'Criteria for Bid Evaluation',
+            'Start of Procurement Activity',
+            'End of Procurement Activity',
+            'Expected Delivery/ Implementation Period',
+            'Source of Funds',
+            'Estimated Budget / Authorized Budgetary Allocation (PhP)'
         ],
-        ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5', 'Column 6', 'Column 7', 'Column 8', 'Column 9', 'Column 10', 'Column 11', 'Column 12']
+        ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5', 'Column 6', 'Column 7', 'Column 8', 'Column 9', 'Column 10', 'Column 11', 'Column 12', 'Column 13', 'Column 14']
     ];
 
     const itemRows = items.map(item => {
         const formattedBudget = parseBudget(item.budget).toLocaleString('en-PH', { minimumFractionDigits: 2 });
-        const strategiesStr = Array.isArray(item.strategies) ? item.strategies.join(", ") : (item.strategies || "");
+        const strategiesStr = Array.isArray(item.strategies) && item.strategies.length > 0
+            ? item.strategies.join(", ") 
+            : (item.strategies || "None");
+        const docsStr = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
+            ? item.supporting_documents.map(d => d.name || 'Document').join(', ')
+            : "None";
 
         return [
-            item.project_description || '',   // Col 1
-            item.project_type || '',          // Col 2
-            item.quantity_size || '',         // Col 3
-            item.mode || '',                  // Col 4
-            item.pre_procurement || '',       // Col 5
-            item.start_date || '',            // Col 6
-            item.end_date || '',              // Col 7
-            item.delivery_period || '',       // Col 8
-            item.fund_source || '',           // Col 9
-            `P ${formattedBudget}`,           // Col 10
-            strategiesStr,                    // Col 11
-            item.remarks || ''                // Col 12
+            item.project_description || '',
+            item.project_type || '',
+            item.quantity_size || '',
+            item.mode || '',
+            item.pre_procurement || '',
+            item.bid_evaluation_criteria || 'N/A', // Col 6: Criteria
+            item.start_date || '',
+            item.end_date || '',
+            item.delivery_period || '',
+            item.fund_source || '',
+            `P ${formattedBudget}`,
+            strategiesStr,                         // Col 12: Strategies
+            docsStr,                               // Col 13: Attached Documents
+            item.remarks || ''                     // Col 14: Remarks
         ];
     });
 
     const rows = [
         ...itemRows,
-        // Summary Total Row
         [
-            { content: 'TOTAL BUDGET:', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+            { content: 'TOTAL BUDGET:', colSpan: 10, styles: { halign: 'right', fontStyle: 'bold' } },
             { content: `P ${formattedTotal}`, styles: { fontStyle: 'bold' } },
+            '',
             '',
             ''
         ]
