@@ -1146,17 +1146,50 @@ html[data-theme="light"] .approval-info strong { color: #15803D; }
     color: var(--db-accent);
 }
 
-.db-entry-expand-row td {
+/* direct child only: a plain descendant selector also stripped the padding
+   from every cell of the table nested inside the dropdown */
+.db-entry-expand-row > td {
     padding: 0 !important;
     border-top: none;
 }
 
+/* ------------------------------------------------------------
+   Readable dropdown sheet
+   - The sheet no longer has its own scroll box; the dropdown grows to
+     fit the items and the page scrolls normally.
+   - Only the table scrolls sideways, and each column has a real minimum
+     width, so words are never chopped mid-way ("PROCUREM ENT").
+   - Everything is scoped to .db-entry-expand-inner, so the full-screen
+     Excel preview and the PDF export keep the official-form look.
+   ------------------------------------------------------------ */
+
+.db-entry-expand-inner {
+    /* width:0 + min-width:100% stops the wide table inside from stretching
+       the whole entries table; it fills the cell and scrolls sideways instead */
+    width: 0;
+    min-width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px 18px;
+    background: var(--db-card-alt);
+    animation: entry-expand-in 0.18s ease;
+}
+
+/* The hover tint on .db-entries-table rows must not paint the dropdown */
+.db-entries-table tbody tr.db-entry-expand-row:hover {
+    background: transparent;
+}
+
 .db-entry-expand-inner .excel-preview-sheet {
-    min-width: 1650px;
+    box-sizing: border-box;
+    min-width: 0;
     width: 100%;
-    max-height: 480px;
-    overflow: auto;
-    border-radius: 8px;
+    max-height: none;
+    overflow: visible;
+    padding: 18px 18px 22px;
+    border: 1px solid #d5dbe5;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    font-family: 'Inter', Arial, sans-serif;
 }
 
 .db-entry-expand-inner .excel-preview-banner {
@@ -1164,15 +1197,276 @@ html[data-theme="light"] .approval-info strong { color: #15803D; }
 }
 
 .db-entry-expand-inner .excel-preview-sheet h2 {
-    margin-top: 10px;
+    margin: 0 0 10px;
+    font-size: 15px;
+    letter-spacing: 0.01em;
 }
 
-.db-entry-expand-inner .excel-preview-sheet {
-    min-width: 0;
-    width: 100%;
-    max-height: 480px;
-    overflow: auto;
+.db-entry-expand-inner .excel-preview-checks {
+    margin-bottom: 14px;
+}
+
+/* Fiscal year / End-user shown as one tidy info strip */
+.db-entry-expand-inner .excel-preview-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 36px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
+}
+
+.db-entry-expand-inner .excel-preview-meta p {
+    margin: 0;
+    font-size: 13px;
+    color: #334155;
+}
+
+/* ---- table shell ---- */
+
+.db-entry-expand-inner .excel-preview-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    scrollbar-width: thin;
+}
+
+.db-entry-expand-inner .excel-preview-table {
+    table-layout: auto;
+    width: 100%;
+    min-width: 1950px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.db-entry-expand-inner .excel-preview-table th,
+.db-entry-expand-inner .excel-preview-table td {
+    padding: 10px 12px;
+    border: 0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    letter-spacing: 0;
+    text-align: left;
+    text-transform: none;
+    vertical-align: top;
+    color: #0f172a;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+}
+
+.db-entry-expand-inner .excel-preview-table th:last-child,
+.db-entry-expand-inner .excel-preview-table td:last-child {
+    border-right: 0;
+}
+
+/* ---- headers ---- */
+
+.db-entry-expand-inner .excel-preview-table thead th {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Row 1: the three group banners get their own tint */
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(1) th {
+    padding: 9px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(1) th:nth-child(1) {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(1) th:nth-child(2) {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(1) th:nth-child(3) {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Row 3: the "Column N" form numbering, kept but quiet.
+   It also sets the width of every column (14 data columns + Actions). */
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th {
+    padding: 3px 8px;
+    background: #fff;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(1)  { width: 240px; min-width: 240px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(2)  { width: 120px; min-width: 120px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(3)  { width: 130px; min-width: 130px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(4)  { width: 150px; min-width: 150px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(5)  { width: 110px; min-width: 110px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(6)  { width: 130px; min-width: 130px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(7)  { width: 110px; min-width: 110px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(8)  { width: 110px; min-width: 110px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(9)  { width: 120px; min-width: 120px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(10) { width: 130px; min-width: 130px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(11) { width: 150px; min-width: 150px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(12) { width: 230px; min-width: 230px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(13) { width: 190px; min-width: 190px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(14) { width: 170px; min-width: 170px; }
+.db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) th:nth-child(15) { width: 52px;  min-width: 52px; }
+
+/* ---- body ---- */
+
+.db-entry-expand-inner .excel-preview-table tbody td {
+    background: #fff;
+}
+
+.db-entry-expand-inner .excel-preview-table tbody tr:nth-child(even) td {
+    background: #fafbfd;
+}
+
+.db-entry-expand-inner .excel-preview-table tbody tr:hover td {
+    background: #f0f6ff;
+}
+
+/* Column 1 (description) is the row's title: bolder, and pinned while
+   the table is scrolled sideways so you always know which item you're on */
+.db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(1):not(.excel-total-label) {
+    font-weight: 600;
+}
+
+@media (min-width: 900px) {
+    .db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(1):not(.excel-total-label),
+    .db-entry-expand-inner .excel-preview-table thead tr:nth-child(2) > th:nth-child(1),
+    .db-entry-expand-inner .excel-preview-table thead tr:nth-child(3) > th:nth-child(1) {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.18);
+    }
+}
+
+/* Numbers and dates line up */
+.db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(5) {
+    text-align: center;
+}
+
+.db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(7),
+.db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(8) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.db-entry-expand-inner .excel-preview-table tbody tr:not(.ep-add-row) > td:nth-child(11) {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Strategies / attached documents rendered as short bulleted lists */
+.db-entry-expand-inner .ep-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.db-entry-expand-inner .ep-list li {
+    position: relative;
+    padding-left: 13px;
+    overflow-wrap: anywhere;
+}
+
+.db-entry-expand-inner .ep-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #94a3b8;
+}
+
+.db-entry-expand-inner .excel-preview-table td span.ep-none {
+    display: inline;
+    margin: 0;
+    font-size: inherit;
+    color: #94a3b8;
+}
+
+/* ---- total row ---- */
+
+.db-entry-expand-inner .excel-preview-table tbody tr:has(> .excel-total-label) > td {
+    background: #f1f5f9;
+    border-top: 2px solid #cbd5e1;
+}
+
+.db-entry-expand-inner .excel-preview-table td.excel-total-label {
+    text-align: right;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #475569;
+}
+
+.db-entry-expand-inner .excel-preview-table td.excel-total-value {
+    text-align: right;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #1e3a8a;
+    background: #e8f0ff;
+}
+
+/* ---- sign-off block: four across instead of three + an orphan ---- */
+
+.db-entry-expand-inner .excel-preview-signatures {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px 32px;
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px dashed #cbd5e1;
+    font-size: 11px;
+}
+
+.db-entry-expand-inner .excel-preview-signatures small {
+    font-size: 10.5px;
+}
+
+@media (max-width: 1100px) {
+    .db-entry-expand-inner .excel-preview-signatures {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .db-entry-expand-inner {
+        padding: 10px;
+    }
+
+    .db-entry-expand-inner .excel-preview-sheet {
+        padding: 14px 12px 18px;
+    }
 }
 
 @keyframes entry-expand-in {
@@ -1180,10 +1474,26 @@ html[data-theme="light"] .approval-info strong { color: #15803D; }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 760px) {
-    .db-entry-expand-inner .excel-preview-sheet {
-        max-height: 380px;
-    }
+/* Edit mode: keep the inputs as easy to read as the plain text */
+.db-entry-expand-inner .ep-input {
+    font-size: 12.5px;
+    padding: 6px 8px;
+}
+
+.db-entry-expand-inner .ep-strategies-box {
+    max-height: 130px;
+}
+
+.db-entry-expand-inner .ep-strategy-opt {
+    font-size: 11.5px;
+}
+
+/* .db-entries-table td span {...} would otherwise turn these into grey blocks */
+.db-entry-expand-inner .excel-preview-table td .ep-strategy-opt span {
+    display: inline;
+    margin: 0;
+    color: #0f172a;
+    font-size: 11.5px;
 }
 
 /* ============================================================

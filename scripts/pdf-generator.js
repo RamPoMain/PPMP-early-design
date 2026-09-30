@@ -67,30 +67,46 @@ async function generatePPMP_PDF() {
     const margin = 10;
 
     // 2. LOAD HEADER IMAGE
+    // The banner is drawn at its real aspect ratio (fit inside the printable
+    // width and a maximum height, centred) so it is never stretched.
     let currentY = 25;
     try {
-        // We fetch the image from your local folder as a "Blob"
+        // Fetch the image from the local folder as a "Blob"
         const response = await fetch('images/header-banner.png');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         const blob = await response.blob();
-        
-        // We convert that Blob into a temporary URL the PDF generator can use
-        const imgData = await new Promise((resolve) => {
+
+        // Convert that Blob into a data URL the PDF generator can use
+        const imgData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
 
-        const imgWidth = pageWidth - 20;
-        const imgHeight = 28; // Adjust height to match your banner ratio
-        
-        doc.addImage(imgData, 'PNG', margin, 5, imgWidth, imgHeight);
-        currentY = imgHeight + 15;
+        // Read the picture's natural size so we can keep its proportions
+        const natural = await new Promise((resolve, reject) => {
+            const probe = new Image();
+            probe.onload = () => resolve({ w: probe.naturalWidth, h: probe.naturalHeight });
+            probe.onerror = reject;
+            probe.src = imgData;
+        });
+
+        const maxImgWidth = pageWidth - margin * 2;
+        const maxImgHeight = 30;   // tallest the banner may be (mm); raise if you want a bigger header
+        const scale = Math.min(maxImgWidth / natural.w, maxImgHeight / natural.h);
+        const imgWidth = natural.w * scale;
+        const imgHeight = natural.h * scale;
+        const imgX = (pageWidth - imgWidth) / 2;   // centre on the page
+
+        doc.addImage(imgData, 'PNG', imgX, 5, imgWidth, imgHeight);
+        currentY = 5 + imgHeight + 10;
     } catch (e) {
         console.error("Image loading failed:", e);
         // If it fails, start lower so the text doesn't overlap a missing image
-        currentY = 30; 
+        currentY = 30;
     }
-    
+
     // 3. LOGOS AND HEADERS
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
@@ -145,10 +161,10 @@ async function generatePPMP_PDF() {
     const itemRows = items.map(item => {
         const formattedBudget = parseBudget(item.budget).toLocaleString('en-PH', { minimumFractionDigits: 2 });
         const strategiesStr = Array.isArray(item.strategies) && item.strategies.length > 0
-            ? item.strategies.join(", ") 
+            ? item.strategies.join("\n") 
             : (item.strategies || "None");
         const docsStr = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
-            ? item.supporting_documents.map(d => d.name || 'Document').join(', ')
+            ? item.supporting_documents.map(d => d.name || 'Document').join('\n')
             : "None";
 
         return [
@@ -180,23 +196,69 @@ async function generatePPMP_PDF() {
         ]
     ];
 
+    // Column widths are proportional shares of the printable width (A4 landscape
+    // minus margins), so all 14 columns fit on the page and no word gets chopped
+    // mid-way. Order = the 14 columns of the PPMP form.
+    const usableWidth = pageWidth - margin * 2;
+    const colWeights = [
+        9.5,   // 1  General description
+        7,     // 2  Type of project
+        7.5,   // 3  Quantity and size
+        7.5,   // 4  Mode of procurement
+        5.5,   // 5  Pre-procurement conference
+        7.5,   // 6  Criteria for bid evaluation
+        6,     // 7  Start of procurement
+        6,     // 8  End of procurement
+        7,     // 9  Delivery / implementation period
+        6.5,   // 10 Source of funds
+        10,    // 11 Estimated budget
+        11.5,  // 12 Strategies and tools
+        8.5,   // 13 Attached documents
+        6.5    // 14 Remarks
+    ];
+    const weightTotal = colWeights.reduce((a, b) => a + b, 0);
+    const columnStyles = {};
+    colWeights.forEach((weight, i) => {
+        columnStyles[i] = { cellWidth: usableWidth * weight / weightTotal };
+    });
+    columnStyles[10].halign = 'right';   // money lines up on the right
+
     doc.autoTable({
         startY: currentY + 10,
         head: headers,
         body: rows,
         theme: 'grid',
-        styles: { fontSize: 6, cellPadding: 2, textColor: [0,0,0], lineColor: [0,0,0], lineWidth: 0.1 },
-        headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
-        columnStyles: {
-            0: { cellWidth: 40 }, 
-            2: { cellWidth: 35 }, 
-            9: { cellWidth: 25 }, 
-            10: { cellWidth: 30 } 
-        }
+        margin: { left: margin, right: margin },
+        tableWidth: usableWidth,
+        rowPageBreak: 'avoid',           // never split one item's row across two pages
+        styles: {
+            fontSize: 6,
+            cellPadding: 1.5,
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            overflow: 'linebreak',
+            valign: 'top'
+        },
+        headStyles: {
+            fillColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 5.5,
+            halign: 'center',
+            valign: 'middle',
+            cellPadding: 1.5
+        },
+        columnStyles: columnStyles
     });
 
     // 5. SIGNATORIES
-    const finalY = doc.lastAutoTable.finalY + 15;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let finalY = doc.lastAutoTable.finalY + 15;
+    // The signature blocks need ~70mm; start a new page instead of running off the bottom.
+    if (finalY + 70 > pageHeight) {
+        doc.addPage();
+        finalY = 20;
+    }
     doc.setFontSize(7);
     
     // Left: Prepared By
@@ -243,5 +305,5 @@ async function generatePPMP_PDF() {
     doc.text("Signature over Printed Name", margin + 30, endorseY + 18, { align: "center" });
     doc.text("Chief, Technical Operations Division", margin + 30, endorseY + 22, { align: "center" });
 
-    doc.save(`PPMP_${data.ppmp}_${data.unit}.pdf`);
+    doc.save(`PPMP_${data.ppmp}_${String(data.unit).replace(/[^\w-]+/g, '_')}.pdf`);
 }

@@ -482,12 +482,28 @@ function isPreviewEditing(recordId) {
     return !!previewDrafts[recordId];
 }
 
+// "Edit" no longer turns the dropdown into editable cells: it opens the
+// request form (the same one used everywhere else), so every edit goes
+// through the form's validation.
 function startPreviewEdit(recordId) {
     const record = getRawRecordById(recordId);
     if (!record || isPpmpLocked(record)) return;
 
-    ensurePreviewDraft(record);
-    refreshPreviewSurfaces(recordId);
+    if (typeof openRequestModal !== 'function' || !document.getElementById('requestModalOverlay')) return;
+
+    // Don't open the form underneath the full-screen preview.
+    if (activeExcelPreviewId !== null && typeof closeExcelPreview === 'function') {
+        closeExcelPreview();
+    }
+
+    openRequestModal(recordId);
+
+    if (getRecordItems(record).length <= 1) {
+        enableEditMode();
+    } else {
+        // The form edits one item at a time: pick the item, then press Edit.
+        showToast('Use the arrows to pick an item, then press Edit.');
+    }
 }
 
 // The row-level buttons (add entry, Excel preview, view details, delete)
@@ -682,6 +698,22 @@ function buildEditableItemRow(record, item) {
 }
 
 
+// Renders a list of values (strategies, attached document names) as a short
+// bulleted list inside a table cell. Accepts an array or a single string;
+// anything empty shows a muted "None". Every value is HTML-escaped here.
+function renderPreviewList(values) {
+    const list = (Array.isArray(values) ? values : [values])
+        .map(v => String(v == null ? '' : v).trim())
+        .filter(Boolean);
+
+    if (list.length === 0) return '<span class="ep-none">None</span>';
+
+    return '<ul class="ep-list">' +
+        list.map(v => '<li>' + escapeHtml(v) + '</li>').join('') +
+        '</ul>';
+}
+
+
 function buildExcelPreviewMarkup(record, editable) {
     const isIndicative = record.is_indicative === 'Indicative';
     const isFinal = record.is_indicative === 'Final';
@@ -693,13 +725,13 @@ function buildExcelPreviewMarkup(record, editable) {
     const itemRows = editable
         ? items.map(item => buildEditableItemRow(record, item)).join('')
         : items.map(item => {
-        const itemStrategies = Array.isArray(item.strategies) && item.strategies.length > 0
-            ? item.strategies.join(', ')
-            : (item.strategies || 'None');
+        const itemStrategies = renderPreviewList(item.strategies);
 
-        const attachedDocs = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
-            ? item.supporting_documents.map(doc => doc.name || 'Document').join(', ')
-            : 'None';
+        const attachedDocs = renderPreviewList(
+            Array.isArray(item.supporting_documents)
+                ? item.supporting_documents.map(doc => doc.name || 'Document')
+                : []
+        );
 
         return `
             <tr>
@@ -714,8 +746,8 @@ function buildExcelPreviewMarkup(record, editable) {
                 <td>${escapeHtml(item.delivery_period || '')}</td>
                 <td>${escapeHtml(item.fund_source || '')}</td>
                 <td>${escapeHtml(formatPesoExact(parseBudgetNumber(item.budget)))}</td>
-                <td>${escapeHtml(itemStrategies)}</td>
-                <td>${escapeHtml(attachedDocs)}</td>
+                <td>${itemStrategies}</td>
+                <td>${attachedDocs}</td>
                 <td>${escapeHtml(item.remarks || '')}</td>
             </tr>
         `;
@@ -1010,12 +1042,12 @@ function populateOfficeFilter(records) {
 let expandedEntryId = null;
 
 function toggleEntryPreviewRow(id) {
-    if (expandedEntryId === id) {
-        delete previewDrafts[id];
-        expandedEntryId = null;
-    } else {
-        expandedEntryId = id;
+    // Whichever row was open loses its unsaved draft, whether we collapse it
+    // or switch to another row.
+    if (expandedEntryId !== null) {
+        delete previewDrafts[expandedEntryId];
     }
+    expandedEntryId = (expandedEntryId === id) ? null : id;
     renderEntries(getRecords());
 }
 
@@ -1130,6 +1162,7 @@ function buildSubmitApprovalDialog() {
 function onSubmitApprovalKeydown(e) {
     if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation(); // don't also close the Excel preview / request modal behind it
         closeSubmitApprovalDialog();
     }
 }
@@ -1516,7 +1549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     if (!session || !session.canRequest) {
-        const newRequestButtons = document.querySelectorAll('.db-nav-item[onclick*="openRequestModal"], .db-cta-btn');
+        const newRequestButtons = document.querySelectorAll('.db-nav-item[onclick*="startNewRequest"], .db-nav-item[onclick*="open_new_request"], .db-nav-item[onclick*="openRequestModal"], .db-cta-btn');
         newRequestButtons.forEach(btn => btn.style.display = 'none');
     }
     
