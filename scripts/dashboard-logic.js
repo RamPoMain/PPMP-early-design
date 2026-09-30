@@ -243,6 +243,42 @@ function getRecordItems(record) {
 }
 
 
+// ------------------------------------------------------------
+// Supporting documents
+// The request form requires at least one attached document on every item
+// (Technical Specifications / Terms of Reference / Scope of Work, depending
+// on the project type). An item can still end up with none - for example one
+// created without going through the form - so a PPMP may not be submitted for
+// approval until every item has one. This is the single check used by the
+// submit dialog, the submit confirmation and the "Needs document" markers.
+// ------------------------------------------------------------
+function getRequiredDocLabel(projectType) {
+    const labels = (typeof PROJECT_TYPE_DOC_LABELS !== 'undefined') ? PROJECT_TYPE_DOC_LABELS : {};
+    return labels[projectType] || 'supporting document';
+}
+
+function itemHasSupportingDocument(item) {
+    return !!item && Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0;
+}
+
+// [{ number, item }] for every item of the record that has no attachment.
+// `number` is the item's 1-based position, matching the item navigator.
+function getItemsMissingDocuments(record) {
+    return getRecordItems(record)
+        .map(function (item, index) { return { number: index + 1, item: item }; })
+        .filter(function (entry) { return !itemHasSupportingDocument(entry.item); });
+}
+
+function buildMissingDocsMessage(missing) {
+    const shown = missing.slice(0, 3).map(function (m) {
+        return 'Item ' + m.number + ' (' + getRequiredDocLabel(m.item.project_type) + ')';
+    });
+    const more = missing.length - shown.length;
+    return 'Attach a supporting document before submitting: ' + shown.join(', ') +
+        (more > 0 ? ' and ' + more + ' more' : '') + '. Open the PPMP and press Edit on each item.';
+}
+
+
 function getRecordTotalBudget(record) {
     return getRecordItems(record).reduce(
         (sum, item) => sum + parseBudgetNumber(item.budget),
@@ -539,9 +575,19 @@ function buildPreviewToolbarHtml(recordId, options = {}) {
     const canEdit = options.canEdit !== false;
 
     if (!isPreviewEditing(recordId)) {
+        const missingDocs = options.record && isPpmpDraft(options.record)
+            ? getItemsMissingDocuments(options.record).length
+            : 0;
+        const docWarning = missingDocs > 0
+            ? `<span class="ep-doc-warning" title="Submit for Approval is blocked until every item has a supporting document">${missingDocs} ${missingDocs === 1 ? 'item needs' : 'items need'} a supporting document</span>`
+            : '';
+
         return `
         <div class="ep-toolbar">
-            <span class="ep-dirty-indicator hidden" data-record-id="${recordId}">Unsaved changes</span>
+            <div class="ep-toolbar-status">
+                <span class="ep-dirty-indicator hidden" data-record-id="${recordId}">Unsaved changes</span>
+                ${docWarning}
+            </div>
             <div class="ep-toolbar-actions">
                 ${options.record && options.actions !== false ? buildEntryActionButtonsHtml(options.record) : ''}
                 ${options.record && isPpmpDraft(options.record) ? `<button type="button" class="ep-submit-btn" onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>` : ''}
@@ -727,14 +773,16 @@ function buildExcelPreviewMarkup(record, editable) {
         : items.map(item => {
         const itemStrategies = renderPreviewList(item.strategies);
 
-        const attachedDocs = renderPreviewList(
-            Array.isArray(item.supporting_documents)
-                ? item.supporting_documents.map(doc => doc.name || 'Document')
-                : []
-        );
+        const attachedDocs = (!itemHasSupportingDocument(item) && isPpmpDraft(record))
+            ? '<span class="ep-none ep-needs-doc" title="Required before this PPMP can be submitted for approval">Needs document</span>'
+            : renderPreviewList(
+                Array.isArray(item.supporting_documents)
+                    ? item.supporting_documents.map(doc => doc.name || 'Document')
+                    : []
+            );
 
         return `
-            <tr>
+            <tr class="ep-item-row" ${itemFilterAttrs(item)}>
                 <td>${escapeHtml(item.project_description || '')}</td>
                 <td>${escapeHtml(item.project_type || '')}</td>
                 <td>${escapeHtml(item.quantity_size || '')}</td>
@@ -816,6 +864,7 @@ function buildExcelPreviewMarkup(record, editable) {
                     </thead>
                     <tbody>
                         ${itemRows}
+                        ${editable ? '' : '<tr class="ep-filter-empty hidden"><td colspan="14">No items match the current filters.</td></tr>'}
                         <tr>
                             <td colspan="10" class="excel-total-label">TOTAL BUDGET:</td>
                             <td class="excel-total-value">${escapeHtml(formattedTotal)}</td>
@@ -824,6 +873,13 @@ function buildExcelPreviewMarkup(record, editable) {
                             <td></td>
                             ${editable ? '<td></td>' : ''}
                         </tr>
+                        ${editable ? '' : `<tr class="ep-filter-subtotal hidden">
+                            <td colspan="10" class="excel-total-label ep-filter-subtotal-label"></td>
+                            <td class="excel-total-value ep-filter-subtotal-value"></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>`}
                         ${editable ? `
                         <tr class="ep-add-row">
                             <td colspan="15">
@@ -1048,6 +1104,7 @@ function toggleEntryPreviewRow(id) {
         delete previewDrafts[expandedEntryId];
     }
     expandedEntryId = (expandedEntryId === id) ? null : id;
+    resetEntryItemFilters();
     renderEntries(getRecords());
 }
 
@@ -1176,6 +1233,12 @@ function openSubmitApprovalDialog(recordId) {
         return;
     }
 
+    const missingDocs = getItemsMissingDocuments(record);
+    if (missingDocs.length > 0) {
+        showToast(buildMissingDocsMessage(missingDocs));
+        return;
+    }
+
     if (!submitApprovalEl) submitApprovalEl = buildSubmitApprovalDialog();
     submitApprovalRecordId = recordId;
 
@@ -1218,6 +1281,13 @@ function confirmSubmitForApproval() {
 
     if (!isPpmpDraft(all[idx])) {
         showToast('This PPMP was already submitted for approval.');
+        refreshPreviewSurfaces(recordId);
+        return;
+    }
+
+    const missingDocs = getItemsMissingDocuments(all[idx]);
+    if (missingDocs.length > 0) {
+        showToast(buildMissingDocsMessage(missingDocs));
         refreshPreviewSurfaces(recordId);
         return;
     }
@@ -1321,6 +1391,194 @@ function savePreviewChanges(recordId) {
 }
 
 
+// ------------------------------------------------------------
+// Item filter inside the expanded PPMP dropdown (Entries page)
+// Lets the person narrow the line items of the one open PPMP by
+// keyword, project type, mode of procurement and document status.
+//
+// Filtering is done by hiding/showing the item <tr> rows already in the
+// DOM (each carries data-* attributes, see itemFilterAttrs), NOT by
+// re-rendering the table. That keeps typing smooth and the search box
+// focused. The filter state lives in entryItemFilters, resets whenever a
+// different PPMP is opened, and is re-applied after every renderEntries().
+// The bar only shows in read-only view (editing always shows every item)
+// and only when the PPMP has 2+ items. The PDF export and the full-screen
+// preview are unaffected and always contain every item.
+// ------------------------------------------------------------
+const ENTRY_ITEM_FILTER_DEFAULTS = { search: '', type: 'All', mode: 'All', docs: 'All' };
+let entryItemFilters = Object.assign({}, ENTRY_ITEM_FILTER_DEFAULTS);
+
+function resetEntryItemFilters() {
+    entryItemFilters = Object.assign({}, ENTRY_ITEM_FILTER_DEFAULTS);
+}
+
+function isEntryItemFilterActive() {
+    const f = entryItemFilters;
+    return !!(f.search.trim() || f.type !== 'All' || f.mode !== 'All' || f.docs !== 'All');
+}
+
+// data-* attributes for one item row: everything the filter needs to
+// decide whether the row matches, without touching the DOM cells.
+function itemFilterAttrs(item) {
+    const docNames = Array.isArray(item.supporting_documents)
+        ? item.supporting_documents.map(function (d) { return d.name || ''; })
+        : [];
+    const haystack = [
+        item.project_description, item.project_type, item.quantity_size, item.mode,
+        item.pre_procurement, item.bid_evaluation_criteria, item.fund_source,
+        item.remarks, item.start_date, item.end_date, item.delivery_period,
+        formatPesoExact(parseBudgetNumber(item.budget)),
+        Array.isArray(item.strategies) ? item.strategies.join(' ') : item.strategies,
+        docNames.join(' ')
+    ].map(function (v) { return String(v == null ? '' : v); }).join(' ').toLowerCase();
+
+    return 'data-search="' + escapeHtml(haystack) + '"' +
+        ' data-type="' + escapeHtml(item.project_type || '') + '"' +
+        ' data-mode="' + escapeHtml(item.mode || '') + '"' +
+        ' data-docs="' + (itemHasSupportingDocument(item) ? 'with' : 'missing') + '"' +
+        ' data-budget="' + parseBudgetNumber(item.budget) + '"';
+}
+
+function buildItemFilterBarHtml(record) {
+    const items = getRecordItems(record);
+    if (items.length < 2) return '';
+
+    function uniqueValues(key) {
+        const seen = [];
+        items.forEach(function (item) {
+            const v = String(item[key] || '').trim();
+            if (v && seen.indexOf(v) === -1) seen.push(v);
+        });
+        return seen.sort();
+    }
+    const types = uniqueValues('project_type');
+    const modes = uniqueValues('mode');
+
+    // A stale selection (its items were deleted) falls back to "All".
+    if (entryItemFilters.type !== 'All' && types.indexOf(entryItemFilters.type) === -1) entryItemFilters.type = 'All';
+    if (entryItemFilters.mode !== 'All' && modes.indexOf(entryItemFilters.mode) === -1) entryItemFilters.mode = 'All';
+
+    function options(values, current, allLabel) {
+        return '<option value="All">' + allLabel + '</option>' + values.map(function (v) {
+            return '<option value="' + escapeHtml(v) + '"' + (v === current ? ' selected' : '') + '>' + escapeHtml(v) + '</option>';
+        }).join('');
+    }
+
+    const docs = entryItemFilters.docs;
+    return `
+        <div class="ep-filter-bar" role="search" aria-label="Filter items in this PPMP">
+            <label class="db-filter-control ep-filter-search">
+                <span>Search items</span>
+                <input id="epFilterSearch" type="search" placeholder="Description, remarks, fund source…"
+                       value="${escapeHtml(entryItemFilters.search)}" oninput="onEntryItemFilterChange()">
+            </label>
+            <label class="db-filter-control">
+                <span>Item type</span>
+                <select id="epFilterType" onchange="onEntryItemFilterChange()">${options(types, entryItemFilters.type, 'All types')}</select>
+            </label>
+            <label class="db-filter-control">
+                <span>Mode</span>
+                <select id="epFilterMode" onchange="onEntryItemFilterChange()">${options(modes, entryItemFilters.mode, 'All modes')}</select>
+            </label>
+            <label class="db-filter-control">
+                <span>Documents</span>
+                <select id="epFilterDocs" onchange="onEntryItemFilterChange()">
+                    <option value="All"${docs === 'All' ? ' selected' : ''}>All</option>
+                    <option value="with"${docs === 'with' ? ' selected' : ''}>With document</option>
+                    <option value="missing"${docs === 'missing' ? ' selected' : ''}>Missing document</option>
+                </select>
+            </label>
+            <div class="ep-filter-meta">
+                <span id="epFilterCount" class="ep-filter-count" aria-live="polite"></span>
+                <button type="button" id="epFilterClear" class="ep-filter-clear hidden" onclick="clearEntryItemFilters()">Clear filters</button>
+            </div>
+        </div>
+    `;
+}
+
+function onEntryItemFilterChange() {
+    const get = function (id, fallback) {
+        const el = document.getElementById(id);
+        return el ? el.value : fallback;
+    };
+    entryItemFilters = {
+        search: get('epFilterSearch', ''),
+        type: get('epFilterType', 'All'),
+        mode: get('epFilterMode', 'All'),
+        docs: get('epFilterDocs', 'All')
+    };
+    applyEntryItemFilters();
+}
+
+function clearEntryItemFilters() {
+    resetEntryItemFilters();
+    const search = document.getElementById('epFilterSearch');
+    if (search) {
+        search.value = '';
+        search.focus();
+    }
+    ['epFilterType', 'epFilterMode', 'epFilterDocs'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.value = 'All';
+    });
+    applyEntryItemFilters();
+}
+
+// Shows/hides item rows in the open dropdown to match entryItemFilters
+// and refreshes the count, "Clear filters" button, empty message and the
+// filtered subtotal. The real TOTAL BUDGET row always stays the full total.
+function applyEntryItemFilters() {
+    const inner = document.querySelector('.db-entry-expand-inner');
+    if (!inner) return;
+
+    const rows = inner.querySelectorAll('tr.ep-item-row');
+    if (rows.length === 0) return;
+
+    const f = entryItemFilters;
+    const terms = f.search.toLowerCase().split(/\s+/).filter(Boolean);
+    const active = isEntryItemFilterActive();
+    let shown = 0;
+    let subtotal = 0;
+
+    rows.forEach(function (row) {
+        const d = row.dataset;
+        const matches =
+            (f.type === 'All' || d.type === f.type) &&
+            (f.mode === 'All' || d.mode === f.mode) &&
+            (f.docs === 'All' || d.docs === f.docs) &&
+            terms.every(function (t) { return d.search.indexOf(t) !== -1; });
+
+        row.classList.toggle('hidden', !matches);
+        if (matches) {
+            shown += 1;
+            subtotal += Number(d.budget) || 0;
+        }
+    });
+
+    const count = inner.querySelector('#epFilterCount');
+    if (count) {
+        count.textContent = active
+            ? 'Showing ' + shown + ' of ' + rows.length + ' items'
+            : rows.length + ' items';
+    }
+
+    const clearBtn = inner.querySelector('#epFilterClear');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !active);
+
+    const emptyRow = inner.querySelector('tr.ep-filter-empty');
+    if (emptyRow) emptyRow.classList.toggle('hidden', shown !== 0);
+
+    const subtotalRow = inner.querySelector('tr.ep-filter-subtotal');
+    if (subtotalRow) {
+        subtotalRow.classList.toggle('hidden', !(active && shown > 0));
+        const label = subtotalRow.querySelector('.ep-filter-subtotal-label');
+        const value = subtotalRow.querySelector('.ep-filter-subtotal-value');
+        if (label) label.textContent = 'FILTERED TOTAL (' + shown + ' of ' + rows.length + ' items):';
+        if (value) value.textContent = formatPesoExact(subtotal);
+    }
+}
+
+
 function renderEntries(records) {
     const tbody = document.getElementById('entriesTableBody');
     if (!tbody) return;
@@ -1334,6 +1592,7 @@ function renderEntries(records) {
     if (expandedEntryId !== null && !filteredRecords.some(r => r.id == expandedEntryId)) {
         delete previewDrafts[expandedEntryId];
         expandedEntryId = null;
+        resetEntryItemFilters();
     }
 
     if (resultCount) {
@@ -1385,6 +1644,7 @@ function renderEntries(records) {
                 <td colspan="10">
                     <div class="db-entry-expand-inner">
                         ${buildPreviewToolbarHtml(Number(record.id), { record: record, canEdit: isEditable })}
+                        ${isEditing ? '' : buildItemFilterBarHtml(record)}
                         ${buildExcelPreviewMarkup(record, isEditing)}
                     </div>
                 </td>
@@ -1392,6 +1652,8 @@ function renderEntries(records) {
             ` : ''}
         `;
     }).join('');
+
+    applyEntryItemFilters();
 }
 
 function initEntryFilters() {

@@ -1835,3 +1835,131 @@ html[data-theme="light"] .review-tag.is-rejected { color: #B91C1C; }
 .modal-status-badge.is-returned { background: rgba(239, 68, 68, 0.14); color: #F87171; }
 html[data-theme="light"] .db-status-pill.is-returned,
 html[data-theme="light"] .modal-status-badge.is-returned { color: #B91C1C; }
+
+/* ============================================================
+   MISSING SUPPORTING DOCUMENTS
+   An item with no attachment is flagged in the Entries preview and
+   blocks "Submit for Approval" (see getItemsMissingDocuments()).
+   ============================================================ */
+
+.ep-toolbar-status {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.ep-doc-warning {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--db-amber);
+}
+
+.ep-doc-warning::before {
+    content: '!';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--db-amber-soft);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* The preview table keeps a light sheet in both themes, so use a darker amber. */
+.excel-preview-table span.ep-needs-doc,
+.db-entry-expand-inner .excel-preview-table td span.ep-none.ep-needs-doc {
+    color: #B45309;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   ENTRIES TABLE — item filter bar inside the expanded PPMP dropdown
+   (see buildItemFilterBarHtml() in dashboard-logic.js). Reuses the
+   .db-filter-control look so it matches the page-level filters.
+   ============================================================ */
+
+.ep-filter-bar {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    background: var(--db-card);
+    border: 1px solid var(--db-border);
+    border-radius: 10px;
+}
+
+.ep-filter-bar .db-filter-control {
+    min-width: 140px;
+}
+
+.ep-filter-bar .ep-filter-search {
+    flex: 1 1 220px;
+    min-width: 200px;
+}
+
+.ep-filter-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+    min-height: 36px;
+}
+
+.ep-filter-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--db-text-dim);
+    white-space: nowrap;
+}
+
+.ep-filter-clear {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--db-field-border);
+    background: transparent;
+    color: var(--db-text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ep-filter-clear:hover {
+    border-color: var(--db-accent);
+    color: var(--db-accent);
+    background: var(--db-accent-soft);
+}
+
+.db-entry-expand-inner .excel-preview-table td.ep-filter-subtotal-label,
+.db-entry-expand-inner .excel-preview-table td.ep-filter-subtotal-value {
+    color: var(--db-accent);
+}
+
+.db-entry-expand-inner .excel-preview-table tr.ep-filter-empty td {
+    text-align: center;
+    padding: 18px 12px;
+    font-style: italic;
+    color: #64748B;
+}
+
+@media (max-width: 700px) {
+    .ep-filter-bar .db-filter-control,
+    .ep-filter-bar .ep-filter-search {
+        flex: 1 1 100%;
+    }
+    .ep-filter-meta {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+}

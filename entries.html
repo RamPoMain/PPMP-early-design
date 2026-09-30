@@ -240,6 +240,33 @@
                             <div class="select-wrapper"><select id="pre_procurement" required><option value="" disabled selected>Select...</option><option>No</option><option>Yes</option></select><img src="images/vector-51.svg" class="custom-chevron"></div>
                             <p class="field-error-msg">This field is required</p>
                         </div>
+                        <div class="field-group" data-field="bid_evaluation_criteria">
+                        <label for="bid_evaluation_criteria">
+                            Criteria for Bid Evaluation (Including Sustainability and Domestic Preference)
+                        </label>
+                        <div class="select-wrapper">
+                            <select id="bid_evaluation_criteria" name="bid_evaluation_criteria">
+                            <option value="">Select Criteria for Bid Evaluation...</option>
+                            <option value="Lowest Calculated Responsive Bid (LCRB)">
+                                Lowest Calculated Responsive Bid (LCRB)
+                            </option>
+                            <option value="Most Economically Advantageous Responsive Bid (MEARB)">
+                                Most Economically Advantageous Responsive Bid (MEARB)
+                            </option>
+                            <option value="Most Advantageous Responsive Bid (MARB) / HRRB / SRRB">
+                                Most Advantageous Responsive Bid (MARB) / HRRB / SRRB
+                            </option>
+                            <option value="Lowest Comparative or Competitive Responsive Bid (LCCRB)">
+                                Lowest Comparative or Competitive Responsive Bid (LCCRB)
+                            </option>
+                            </select>
+                            <span class="custom-chevron">▼</span>
+                        </div>
+                        <p id="mearbHint" class="mode-hint hidden" style="color: #0284c7; font-weight: 600; margin-top: 4px;">
+                            ℹ️ NOTE: If using MEARB, ensure sustainability indicators are included.
+                        </p>
+                        <p class="field-error-msg">Please select a criteria for bid evaluation.</p>
+                        </div>
                         <div class="field-group" data-field="quantity_size">
                             <label>Quantity and Size of the Project</label>
                             <textarea id="quantity_size" placeholder="Message text goes here" style="height: 150px;" required></textarea>
