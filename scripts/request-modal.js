@@ -323,6 +323,11 @@ function getPendingPpmpGroups() {
 
 
 function startNewRequest() {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canRequest) {
+        showToast('Your account is view/approve only and cannot create new requests.');
+        return;
+    }
     const groups = getPendingPpmpGroups();
     const chooser = document.getElementById('ppmpChoiceModalOverlay');
 
@@ -2719,9 +2724,11 @@ function updateVerifyButtonLabel() {
 // Shows/hides the modal controls for a record in view mode.
 function applyApprovalState(record) {
     const status = getPpmpStatus(record);
-    const isLocked = status !== 'Draft';           // submitted or approved: requester can't edit
+    const isLocked = status !== 'Draft';
     const canApprove = typeof canSessionActOnRecord === 'function' && canSessionActOnRecord(record);
-
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const canReq = !!(session && session.canRequest);
+    const canEdit = !isLocked && canReq; // Only requesters can edit drafts
     updateStatusBadge(record.status);
     applyReturnedBadge(record);
     updateVerifyButtonLabel();
@@ -2731,11 +2738,12 @@ function applyApprovalState(record) {
     const verifyBtn = document.getElementById('verifyRequestBtn');
     if (verifyBtn) verifyBtn.classList.toggle('hidden', status !== 'For Approval' || !canApprove);
 
+    // Hide edit and delete item buttons from TOD, BO, and RD
     const editBtn = document.getElementById('editRequestBtn');
-    if (editBtn) editBtn.classList.toggle('hidden', isLocked);
+    if (editBtn) editBtn.classList.toggle('hidden', !canEdit);
 
     const deleteItemBtn = document.getElementById('deleteItemBtn');
-    if (deleteItemBtn) deleteItemBtn.classList.toggle('hidden', isLocked);
+    if (deleteItemBtn) deleteItemBtn.classList.toggle('hidden', !canEdit);
 }
 
 // Green banner near the top of the modal: who approved and when.
@@ -3066,6 +3074,17 @@ function deleteCurrentItem() {
 }
 
 function enableEditMode() {
+
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canRequest) {
+        showToast('Your account is view/approve only and cannot edit requests.');
+        return;
+    }
+    if (isCurrentPpmpLocked()) {
+        showToast('This PPMP is submitted for approval or approved — it can no longer be edited.');
+        return;
+    }
+    
     if (isCurrentPpmpLocked()) {
         showToast('This PPMP is submitted for approval or approved — it can no longer be edited.');
         return;

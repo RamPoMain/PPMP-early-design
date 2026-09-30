@@ -4,6 +4,14 @@
 
 document.addEventListener("DOMContentLoaded", function () {
 
+
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canRequest) {
+        document.querySelectorAll('.profile-request-btn, .profile-quick-card').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+    
     // --------------------------------------------------------
     // ELEMENTS
     // --------------------------------------------------------

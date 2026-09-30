@@ -522,6 +522,11 @@ function isPreviewEditing(recordId) {
 // request form (the same one used everywhere else), so every edit goes
 // through the form's validation.
 function startPreviewEdit(recordId) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canRequest) {
+        showToast('Your account is view/approve only and cannot edit requests.');
+        return;
+    }
     const record = getRawRecordById(recordId);
     if (!record || isPpmpLocked(record)) return;
 
@@ -548,31 +553,36 @@ function startPreviewEdit(recordId) {
 function buildEntryActionButtonsHtml(record) {
     const recordId = Number(record.id);
     const isPending = isPpmpDraft(record);
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const canReq = !!(session && session.canRequest);
 
     return `
-                <div class="db-entry-actions">
-                    ${isPending ? `
-                    <button type="button" class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
-                    </button>
-                    ` : ''}
-                    <button type="button" class="db-action-btn" title="Preview Excel Format" onclick="openExcelPreview(${recordId})">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V18.5C20 19.3 19.3 20 18.5 20H5.5C4.7 20 4 19.3 4 18.5V5.5Z"/><path d="M4 9H20M4 14H20M9 4V20M15 4V20"/></svg>
-                    </button>
-                    <button type="button" class="db-action-btn" title="View Details" onclick="openEntryRecord(${recordId})">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
-                    ${canDeleteRecord(record) ? `<button type="button" class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    </button>` : ''}
-                </div>`;
+        <div class="db-entry-actions">
+            ${(isPending && canReq) ? `
+            <button type="button" class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
+            </button>
+            ` : ''}
+            <button type="button" class="db-action-btn" title="Preview Excel Format" onclick="openExcelPreview(${recordId})">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V18.5C20 19.3 19.3 20 18.5 20H5.5C4.7 20 4 19.3 4 18.5V5.5Z"/><path d="M4 9H20M4 14H20M9 4V20M15 4V20"/></svg>
+            </button>
+            <button type="button" class="db-action-btn" title="View Details" onclick="openEntryRecord(${recordId})">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            ${canDeleteRecord(record) ? `<button type="button" class="db-action-btn delete" title="Delete" onclick="deleteRecord(${recordId})">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>` : ''}
+        </div>`;
 }
 
 // options.record  -> also show that record's action buttons (view mode only,
 //                    so nobody navigates away mid-edit with unsaved changes)
 // options.canEdit -> false hides Edit (approved PPMPs); default true
 function buildPreviewToolbarHtml(recordId, options = {}) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const canReq = !!(session && session.canRequest);
     const canEdit = options.canEdit !== false;
+    
 
     if (!isPreviewEditing(recordId)) {
         const missingDocs = options.record && isPpmpDraft(options.record)
@@ -590,7 +600,7 @@ function buildPreviewToolbarHtml(recordId, options = {}) {
             </div>
             <div class="ep-toolbar-actions">
                 ${options.record && options.actions !== false ? buildEntryActionButtonsHtml(options.record) : ''}
-                ${options.record && isPpmpDraft(options.record) ? `<button type="button" class="ep-submit-btn" onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>` : ''}
+                ${(options.record && isPpmpDraft(options.record) && canReq) ? `<button type="button" class="ep-submit-btn" onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>` : ''}
                 ${canEdit ? `<button type="button" class="ep-save-btn" onclick="startPreviewEdit(${recordId})">Edit</button>` : ''}
             </div>
         </div>
@@ -945,8 +955,10 @@ function openExcelPreview(id) {
 // while it's open (refreshPreviewSurfaces), so Save/Discard/Add/Remove
 // all stay in sync without closing and reopening the modal.
 function renderExcelPreviewOverlay(record) {
-    const isEditable = !isPpmpLocked(record);          // may be edited (shows the Edit button)
-    const isEditing = isEditable && isPreviewEditing(record.id); // currently in edit mode
+    const session = typeof getSession === 'function' ? getSession() : null;
+    const canReq = !!(session && session.canRequest);
+    const isEditable = !isPpmpLocked(record) && canReq;
+    const isEditing = isEditable && isPreviewEditing(record.id);
 
     let overlay = document.getElementById('excelPreviewOverlay');
 
@@ -1162,6 +1174,11 @@ function addPreviewItem(recordId) {
 // Unsaved inline edits are kept safe: closing the preview or hopping from
 // entries.html to index.html would discard them, so ask to save first.
 function addItemViaRequestModal(recordId) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || !session.canRequest) {
+        showToast('Your account is view/approve only and cannot add items.');
+        return;
+    }
     const record = getRawRecordById(recordId);
     if (!record || isPpmpLocked(record)) return;
 
@@ -1619,8 +1636,14 @@ function renderEntries(records) {
         const budget = formatPeso(getRecordTotalBudget(record));
         const recordId = Number(record.id);
         const entryNumber = approvedNumbers.get(String(record.id));
-        const isExpanded = expandedEntryId === record.id;
-        const isEditable = isExpanded && !isPpmpLocked(record);
+        
+        const isExpanded = (typeof expandedEntryId !== 'undefined') && expandedEntryId === record.id;
+        // Check if current user is allowed to request/edit
+        const session = typeof getSession === 'function' ? getSession() : null;
+        const canReq = !!(session && session.canRequest);
+
+        // isEditable will now be FALSE for TOD, Budget Officer, and RD
+        const isEditable = isExpanded && !isPpmpLocked(record) && canReq;
         const isEditing = isEditable && isPreviewEditing(record.id);
 
         return `

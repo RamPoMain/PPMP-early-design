@@ -173,6 +173,35 @@ function requireAuth() {
     }
 }
 
+// Hides all "New Request" triggers across all pages for accounts without request rights
+function applyRequestPermissions() {
+    const session = getSession();
+    if (!session || !session.canRequest) {
+        // Hide sidebar buttons, dashboard CTA, and profile buttons
+        const selectors = [
+            '.db-nav-item[onclick*="startNewRequest"]',
+            '.db-nav-item[onclick*="open_new_request"]',
+            '.db-nav-item[onclick*="openRequestModal"]',
+            '.db-cta-btn',
+            '.profile-request-btn',
+            '.profile-quick-card'
+        ];
+        document.querySelectorAll(selectors.join(', ')).forEach(el => {
+            el.style.display = 'none';
+        });
+
+        // Also catch any button or link whose text says "New Request"
+        document.querySelectorAll('a, button').forEach(el => {
+            const text = (el.textContent || '').trim().toLowerCase();
+            if (text.includes('new request') || text.includes('create request')) {
+                if (el.classList.contains('db-nav-item') || el.classList.contains('profile-request-btn') || el.classList.contains('db-cta-btn')) {
+                    el.style.display = 'none';
+                }
+            }
+        });
+    }
+}
+
 // Fills the sidebar's avatar/name/email from the current session.
 // Safe to call on any page that has the standard .db-avatar /
 // .db-user-name / .db-user-email sidebar markup.
@@ -322,5 +351,6 @@ window.addEventListener('pageshow', function (e) {
 
 document.addEventListener('DOMContentLoaded', function () {
     applySessionToSidebar();
+    applyRequestPermissions();
     initLogoutLinks();
 });
