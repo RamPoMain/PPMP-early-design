@@ -156,10 +156,13 @@
     // Sheet -> rows
     // ------------------------------------------------------------
 
-    // Maps each column key to its index in the header row.
+    // Maps each column key to its index in ONE header row.
+    // Returns { index, missing, foundCount }. Columns marked `optional`
+    // are never reported as missing.
     function mapHeaders(headerRow) {
         var index = {};
         var used = {};
+        var foundCount = 0;
         (headerRow || []).forEach(function (cell, i) {
             var text = str(cell).toLowerCase().replace(/\s+/g, ' ');
             if (!text) return;
@@ -168,12 +171,66 @@
                 if (!used[col.key] && col.match.test(text)) {
                     index[col.key] = i;
                     used[col.key] = true;
+                    foundCount += 1;
                     break;
                 }
             }
         });
-        var missing = COLUMNS.filter(function (col) { return index[col.key] === undefined; });
-        return { index: index, missing: missing };
+        var missing = COLUMNS.filter(function (col) {
+            return !col.optional && index[col.key] === undefined;
+        });
+        return { index: index, missing: missing, foundCount: foundCount };
+    }
+
+    // The downloaded template (and the PPMP form it copies) splits its
+    // headers over TWO rows: a group row (PROCUREMENT STRATEGIES AND TOOLS,
+    // ATTACHED SUPPORTING DOCUMENTS, REMARKS, ...) above a row holding the
+    // other eleven column titles. This reads the two rows together; the
+    // lower, more specific row wins when both name the same column.
+    function mapHeaderBlock(upperRow, lowerRow) {
+        var upper = mapHeaders(upperRow);
+        var lower = mapHeaders(lowerRow);
+        var index = {};
+        var usedIdx = {};
+        // Lower row first so its specific titles claim their columns.
+        [lower.index, upper.index].forEach(function (source) {
+            Object.keys(source).forEach(function (key) {
+                var i = source[key];
+                if (index[key] !== undefined || usedIdx[i]) return;
+                index[key] = i;
+                usedIdx[i] = true;
+            });
+        });
+        var foundCount = Object.keys(index).length;
+        var missing = COLUMNS.filter(function (col) {
+            return !col.optional && index[col.key] === undefined;
+        });
+        return { index: index, missing: missing, foundCount: foundCount };
+    }
+
+    // Finds the table header in the first rows of the sheet. Tries each row
+    // alone and together with the row below it, and keeps whichever reads
+    // the most columns (a single row wins ties). Returns
+    // { mapped, rowsUsed, headerIndex } or null.
+    function findHeader(rows) {
+        var best = null;
+        var limit = Math.min(rows.length, 15);
+        for (var i = 0; i < limit; i++) {
+            var single = mapHeaders(rows[i]);
+            if (single.foundCount >= 4 && (!best || single.foundCount > best.mapped.foundCount)) {
+                best = { mapped: single, rowsUsed: 1, headerIndex: i };
+            }
+            var lowerRow = rows[i + 1];
+            // Only fold in the next row if it looks like a header row itself
+            // (never a data row that happens to contain a keyword).
+            if (lowerRow && mapHeaders(lowerRow).foundCount >= 3) {
+                var block = mapHeaderBlock(rows[i], lowerRow);
+                if (block.foundCount >= 4 && (!best || block.foundCount > best.mapped.foundCount)) {
+                    best = { mapped: block, rowsUsed: 2, headerIndex: i };
+                }
+            }
+        }
+        return best;
     }
 
     // Checks one row. Returns { item, errors }. `item` is only set when
@@ -274,21 +331,19 @@
             return { fatal: 'The file is empty.', ready: [], problems: [], total: 0 };
         }
 
-        // Dynamically find the table header row
-        var headerIndex = -1;
-        var mapped = null;
-        for (var i = 0; i < Math.min(rows.length, 15); i++) {
-            var testMapped = mapHeaders(rows[i]);
-            if (testMapped.foundCount >= 4) {
-                headerIndex = i;
-                mapped = testMapped;
-                break;
-            }
-        }
-
-        if (headerIndex === -1 || !mapped || mapped.missing.length) {
+        var header = findHeader(rows);
+        if (!header) {
             return {
-                fatal: 'The column headers were not found. Please keep the table header row intact.',
+                fatal: 'The column headers were not found. Please use the downloaded template and keep its table header rows intact.',
+                ready: [], problems: [], total: 0
+            };
+        }
+        var mapped = header.mapped;
+        if (mapped.missing.length) {
+            return {
+                fatal: 'These columns are missing from the file: ' +
+                    mapped.missing.map(function (col) { return col.label; }).join(', ') +
+                    '. Please use the downloaded template and keep its table header rows intact.',
                 ready: [], problems: [], total: 0
             };
         }
@@ -297,13 +352,14 @@
         var problems = [];
         var total = 0;
 
-        // Start right after the headers (skip "Column 1, Column 2..." if present)
-        var startRow = headerIndex + 1;
-        if (startRow < rows.length) {
-            var checkRow = (rows[startRow] || []).join(' ').toLowerCase();
-            if (checkRow.indexOf('column 1') !== -1 || checkRow.indexOf('column 2') !== -1) {
-                startRow++;
-            }
+        // Start right after the header rows, skipping the "Column 1 ... Column 14"
+        // numbering row the template has under them.
+        var startRow = header.headerIndex + header.rowsUsed;
+        while (startRow < rows.length) {
+            var numbering = (rows[startRow] || []).map(str).filter(Boolean);
+            var isNumberRow = numbering.length > 0 && numbering.every(function (t) { return /^column\s*\d+$/i.test(t); });
+            if (!isNumberRow) break;
+            startRow++;
         }
 
         for (var r = startRow; r < rows.length; r++) {
@@ -518,6 +574,7 @@
                         var align = (colIdx === 11) ? 'right' : ((colIdx >= 2 && colIdx <= 9) ? 'center' : 'left');
                         cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
                         if (colIdx === 11) cell.numFmt = '"P "#,##0.00';
+                        if (colIdx >= 7 && colIdx <= 9) cell.numFmt = 'yyyy-mm-dd';
                     }
                 }
             }
@@ -600,7 +657,37 @@
             endOCell.font = { name: 'Arial', size: 8.5 };
             endOCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-            // 10. Generate and trigger download
+            // 10. Instructions sheet: allowed values, read from the form itself
+            var allowed = getAllowedValues();
+            var help = workbook.addWorksheet('Instructions');
+            help.columns = [{ width: 34 }, { width: 80 }];
+            var helpRows = [
+                ['How to fill in the "' + TEMPLATE_SHEET + '" sheet', ''],
+                ['', ''],
+                ['Rows', 'One item per row, in the numbered rows under the headers. Add more rows above the TOTAL BUDGET row if you need them.'],
+                ['Dates', 'Start, End and Delivery must be full dates (YYYY-MM-DD), e.g. 2026-10-01. End must not be before Start; Delivery must be after End.'],
+                ['Budget', 'A number greater than 0. The mode must match the budget bracket (e.g. Small Value Procurement within its limit).'],
+                ['Strategies', 'One or more of the strategies below, separated by a semicolon or a new line.'],
+                ['Supporting documents', 'Leave blank. Files cannot be imported; attach them to each item (Edit) before submitting.'],
+                ['Do not change', 'The header rows, the sheet name, or the TOTAL BUDGET / signature rows.'],
+                ['', ''],
+                ['Type of the Project', allowed.types.join('\n')],
+                ['Recommended Mode of Procurement', allowed.modes.join('\n')],
+                ['Pre-Procurement Conference', allowed.yesNo.join('\n')],
+                ['Criteria for Bid Evaluation', allowed.criteria.join('\n')],
+                ['Procurement Strategies and Tools', allowed.strategies.join('\n')]
+            ];
+            helpRows.forEach(function (values, i) {
+                var row = help.getRow(i + 1);
+                row.getCell(1).value = values[0];
+                row.getCell(2).value = values[1];
+                row.getCell(1).font = { name: 'Arial', size: i === 0 ? 13 : 10, bold: true };
+                row.getCell(2).font = { name: 'Arial', size: 10 };
+                row.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+                row.getCell(1).alignment = { vertical: 'top' };
+            });
+
+            // 11. Generate and trigger download
             var buffer = await workbook.xlsx.writeBuffer();
             var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             var url = URL.createObjectURL(blob);
@@ -989,8 +1076,10 @@
         toIsoDate: toIsoDate,
         toBudget: toBudget,
         mapHeaders: mapHeaders,
+        findHeader: findHeader,
         validateRow: validateRow,
-        analyzeRows: analyzeRows
+        analyzeRows: analyzeRows,
+        downloadTemplate: downloadTemplate
     };
     if (typeof window !== 'undefined') window.BulkImport = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
