@@ -592,6 +592,20 @@ function buildPreviewToolbarHtml(recordId, options = {}) {
             ? `<span class="ep-doc-warning" title="Submit for Approval is blocked until every item has a supporting document">${missingDocs} ${missingDocs === 1 ? 'item needs' : 'items need'} a supporting document</span>`
             : '';
 
+        // Submit stays visible but is disabled (greyed out) while any item
+        // has no supporting document. aria-disabled (not disabled) keeps the
+        // click working, so pressing it still explains what is missing; the
+        // real block is in openSubmitApprovalDialog() and
+        // confirmSubmitForApproval().
+        const submitBlocked = missingDocs > 0;
+        const submitBtn = (options.record && isPpmpDraft(options.record) && canReq)
+            ? `<button type="button" class="ep-submit-btn${submitBlocked ? ' is-blocked' : ''}"` +
+              (submitBlocked
+                  ? ` aria-disabled="true" title="Attach a supporting document to ${missingDocs === 1 ? 'the item' : 'each of the ' + missingDocs + ' items'} marked 'Needs document' before submitting"`
+                  : '') +
+              ` onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>`
+            : '';
+
         return `
         <div class="ep-toolbar">
             <div class="ep-toolbar-status">
@@ -600,7 +614,7 @@ function buildPreviewToolbarHtml(recordId, options = {}) {
             </div>
             <div class="ep-toolbar-actions">
                 ${options.record && options.actions !== false ? buildEntryActionButtonsHtml(options.record) : ''}
-                ${(options.record && isPpmpDraft(options.record) && canReq) ? `<button type="button" class="ep-submit-btn" onclick="openSubmitApprovalDialog(${recordId})">Submit for Approval</button>` : ''}
+                ${submitBtn}
                 ${canEdit ? `<button type="button" class="ep-save-btn" onclick="startPreviewEdit(${recordId})">Edit</button>` : ''}
             </div>
         </div>
@@ -675,9 +689,7 @@ function buildEditableItemRow(record, item) {
         `;
     }).join('');
 
-    const docsDisplay = Array.isArray(item.supporting_documents) && item.supporting_documents.length > 0
-        ? item.supporting_documents.map(d => escapeHtml(d.name || 'Document')).join(', ')
-        : 'None';
+    const docsDisplay = renderPreviewDocs(item, record.id);
 
     return `
         <tr data-preview-item-row="${iid}">
@@ -754,6 +766,123 @@ function buildEditableItemRow(record, item) {
 }
 
 
+// ------------------------------------------------------------
+// Attached supporting documents inside the PPMP preview / dropdown.
+// Each file name is a link that opens the document in a new tab, with a
+// small download button beside it. The files live in storage as base64
+// data: URLs; browsers block opening a data: URL directly in a new tab,
+// so the bytes are rebuilt into a Blob and opened through a blob: URL.
+// ------------------------------------------------------------
+function previewDocToBlob(dataUrl) {
+    try {
+        const comma = String(dataUrl || '').indexOf(',');
+        if (comma === -1) return null;
+        const header = dataUrl.slice(0, comma);
+        const mimeMatch = header.match(/^data:([^;,]*)/);
+        const mime = (mimeMatch && mimeMatch[1]) || 'application/octet-stream';
+        const payload = dataUrl.slice(comma + 1);
+        let bytes;
+        if (/;base64/i.test(header)) {
+            const binary = atob(payload);
+            bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        } else {
+            bytes = new TextEncoder().encode(decodeURIComponent(payload));
+        }
+        return new Blob([bytes], { type: mime });
+    } catch (err) {
+        return null;
+    }
+}
+
+// Finds one stored document. Looks in the open edit draft first (so it also
+// works while the PPMP is being edited), then in the saved record.
+function findPreviewDoc(recordId, itemId, docIndex) {
+    const draft = previewDrafts[recordId];
+    const record = getRawRecordById(recordId);
+    const sources = [];
+    if (draft && Array.isArray(draft.items)) sources.push(draft.items);
+    if (record) sources.push(getRecordItems(record));
+    for (const items of sources) {
+        const item = items.find(it => it.id == itemId);
+        const docs = item && Array.isArray(item.supporting_documents) ? item.supporting_documents : null;
+        if (docs && docs[docIndex]) return docs[docIndex];
+    }
+    return null;
+}
+
+function resolvePreviewDoc(btn) {
+    const doc = findPreviewDoc(
+        Number(btn.dataset.recordId), btn.dataset.itemId, Number(btn.dataset.docIndex)
+    );
+    if (!doc || !doc.dataUrl) {
+        showToast('This file could not be opened - its contents were not saved. Re-attach it by editing the item.');
+        return null;
+    }
+    const blob = previewDocToBlob(doc.dataUrl);
+    if (!blob) {
+        showToast('This file could not be read. Re-attach it by editing the item.');
+        return null;
+    }
+    return { doc: doc, blob: blob };
+}
+
+function openPreviewDoc(btn, event) {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    const found = resolvePreviewDoc(btn);
+    if (!found) return;
+    const url = URL.createObjectURL(found.blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+        // Pop-up blocked: fall back to downloading so the click still does something.
+        downloadBlobAs(url, found.doc.name || 'document');
+        showToast('Your browser blocked the new tab, so the file was downloaded instead.');
+    }
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+}
+
+function downloadPreviewDoc(btn, event) {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    const found = resolvePreviewDoc(btn);
+    if (!found) return;
+    const url = URL.createObjectURL(found.blob);
+    downloadBlobAs(url, found.doc.name || 'document');
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function downloadBlobAs(url, fileName) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// The "Attached Supporting Documents" cell: one row per file, name opens it,
+// arrow downloads it. A file with no stored contents shows as plain text.
+function renderPreviewDocs(item, recordId) {
+    const docs = Array.isArray(item && item.supporting_documents) ? item.supporting_documents : [];
+    if (docs.length === 0) return '<span class="ep-none">None</span>';
+
+    return '<ul class="ep-list ep-doc-list">' + docs.map(function (doc, index) {
+        const name = (doc && doc.name) || 'Document';
+        if (!doc || !doc.dataUrl) {
+            return '<li>' + escapeHtml(name) + '</li>';
+        }
+        const attrs = ' data-record-id="' + Number(recordId) + '" data-item-id="' + escapeHtml(item.id) +
+            '" data-doc-index="' + index + '"';
+        return '<li class="ep-doc-item">' +
+            '<button type="button" class="ep-doc-link"' + attrs + ' title="Open ' + escapeHtml(name) + '"' +
+                ' onclick="openPreviewDoc(this, event)">' + escapeHtml(name) + '</button>' +
+            '<button type="button" class="ep-doc-download"' + attrs + ' title="Download ' + escapeHtml(name) + '"' +
+                ' aria-label="Download ' + escapeHtml(name) + '" onclick="downloadPreviewDoc(this, event)">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</button></li>';
+    }).join('') + '</ul>';
+}
+
+
 // Renders a list of values (strategies, attached document names) as a short
 // bulleted list inside a table cell. Accepts an array or a single string;
 // anything empty shows a muted "None". Every value is HTML-escaped here.
@@ -785,11 +914,7 @@ function buildExcelPreviewMarkup(record, editable) {
 
         const attachedDocs = (!itemHasSupportingDocument(item) && isPpmpDraft(record))
             ? '<span class="ep-none ep-needs-doc" title="Required before this PPMP can be submitted for approval">Needs document</span>'
-            : renderPreviewList(
-                Array.isArray(item.supporting_documents)
-                    ? item.supporting_documents.map(doc => doc.name || 'Document')
-                    : []
-            );
+            : renderPreviewDocs(item, record.id);
 
         return `
             <tr class="ep-item-row" ${itemFilterAttrs(item)}>

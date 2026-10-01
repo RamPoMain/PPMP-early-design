@@ -1721,6 +1721,16 @@ textarea.ep-input {
 
 .ep-submit-btn:hover { background: var(--db-accent-soft); }
 
+/* Blocked: at least one item has no supporting document. */
+.ep-submit-btn.is-blocked,
+.ep-submit-btn.is-blocked:hover {
+    background: transparent;
+    color: var(--db-text-faint);
+    border-color: var(--db-field-border);
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
 /* ============================================================
    PPMP REVIEW — approve / reject / remarks
    Dialog (built in request-modal.js) reuses the .logout-* shell.
@@ -1963,3 +1973,47 @@ html[data-theme="light"] .modal-status-badge.is-returned { color: #B91C1C; }
         justify-content: space-between;
     }
 }
+
+/* ============================================================
+   Attached supporting documents in the PPMP preview: clickable
+   file names (open) + a small download button. The preview sheet
+   stays light in both themes, so these use fixed blues.
+   ============================================================ */
+
+.ep-doc-list li { display: flex; align-items: center; gap: 6px; }
+
+.ep-doc-link {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: #0369a1;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.ep-doc-link:hover { color: #0c4a6e; }
+
+.ep-doc-download {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid #bfdbfe;
+    border-radius: 5px;
+    background: #eff6ff;
+    color: #0369a1;
+    cursor: pointer;
+}
+
+.ep-doc-download:hover { background: #dbeafe; border-color: #93c5fd; }
+
+.ep-doc-link:focus-visible,
+.ep-doc-download:focus-visible { outline: 2px solid #0088ff; outline-offset: 2px; }
