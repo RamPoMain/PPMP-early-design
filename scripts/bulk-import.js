@@ -36,19 +36,20 @@
     // column by its header text, so reordering columns or adding extra ones
     // in Excel does not break the import.
     var COLUMNS = [
-        { key: 'project_description',     label: 'Description',        match: /description|objective/,        width: 44, header: 'General Description and Objective of the Project to be Procured' },
-        { key: 'project_type',            label: 'Type of Project',    match: /type of (the )?project/,       width: 26, header: 'Type of Project (Goods / Consulting Services / Infrastructure)' },
-        { key: 'quantity_size',           label: 'Quantity and Size',  match: /quantity|size/,                width: 28, header: 'Quantity and Size of the Project' },
-        { key: 'mode',                    label: 'Mode of Procurement',match: /\bmode\b/,                     width: 32, header: 'Recommended Mode of Procurement' },
-        { key: 'pre_procurement',         label: 'Pre-Procurement',    match: /pre.?procurement/,             width: 24, header: 'Pre-Procurement Conference (Yes / No)' },
-        { key: 'bid_evaluation_criteria', label: 'Bid Criteria',       match: /criteria/,                     width: 40, header: 'Criteria for Bid Evaluation' },
-        { key: 'start_date',              label: 'Start date',         match: /^start/,                       width: 22, header: 'Start of Procurement Activity (YYYY-MM-DD)' },
-        { key: 'end_date',                label: 'End date',           match: /^end/,                         width: 22, header: 'End of Procurement Activity (YYYY-MM-DD)' },
-        { key: 'delivery_period',         label: 'Delivery period',    match: /delivery|implementation/,      width: 26, header: 'Expected Delivery / Implementation Period (YYYY-MM-DD)' },
-        { key: 'fund_source',             label: 'Source of Funds',    match: /fund/,                         width: 22, header: 'Source of Funds' },
-        { key: 'budget',                  label: 'Budget',             match: /budget/,                       width: 22, header: 'Estimated Budget / Budgetary Allocation (PHP)' },
-        { key: 'strategies',              label: 'Strategies',         match: /strateg/,                      width: 40, header: 'Procurement Strategies and Tools (separate with ;)' },
-        { key: 'remarks',                 label: 'Remarks',            match: /remark/,                       width: 30, header: 'Remarks' }
+        { key: 'project_description',     label: 'Description',        match: /description|objective/,        width: 36, header: 'General Description and Objective of the Project to be Procured' },
+        { key: 'project_type',            label: 'Type of Project',    match: /type of (the )?project/,       width: 22, header: 'Type of the Project to be Procured' },
+        { key: 'quantity_size',           label: 'Quantity and Size',  match: /quantity|size/,                width: 24, header: 'Quantity and Size of the Project to be Procured' },
+        { key: 'mode',                    label: 'Mode of Procurement',match: /\bmode\b/,                     width: 26, header: 'Recommended Mode of Procurement' },
+        { key: 'pre_procurement',         label: 'Pre-Procurement',    match: /pre.?procurement/,             width: 20, header: 'Pre-Procurement Conference (Yes/No)' },
+        { key: 'bid_evaluation_criteria', label: 'Bid Criteria',       match: /criteria/,                     width: 30, header: 'Criteria for Bid Evaluation' },
+        { key: 'start_date',              label: 'Start date',         match: /^start/,                       width: 18, header: 'Start of Procurement Activity' },
+        { key: 'end_date',                label: 'End date',           match: /^end/,                         width: 18, header: 'End of Procurement Activity' },
+        { key: 'delivery_period',         label: 'Delivery period',    match: /delivery|implementation/,      width: 22, header: 'Expected Delivery/ Implementation Period' },
+        { key: 'fund_source',             label: 'Source of Funds',    match: /fund/,                         width: 18, header: 'Source of Funds' },
+        { key: 'budget',                  label: 'Budget',             match: /budget/,                       width: 24, header: 'Estimated Budget / Authorized Budgetary Allocation (PhP)' },
+        { key: 'strategies',              label: 'Strategies',         match: /strateg/,                      width: 32, header: 'PROCUREMENT STRATEGIES AND TOOLS' },
+        { key: 'supporting_documents',    label: 'Supporting Docs',    match: /supporting|attached/,          width: 24, header: 'ATTACHED SUPPORTING DOCUMENTS', optional: true },
+        { key: 'remarks',                 label: 'Remarks',            match: /remark/,                       width: 20, header: 'REMARKS' }
     ];
 
     // ------------------------------------------------------------
@@ -273,11 +274,21 @@
             return { fatal: 'The file is empty.', ready: [], problems: [], total: 0 };
         }
 
-        var mapped = mapHeaders(rows[0]);
-        if (mapped.missing.length) {
+        // Dynamically find the table header row
+        var headerIndex = -1;
+        var mapped = null;
+        for (var i = 0; i < Math.min(rows.length, 15); i++) {
+            var testMapped = mapHeaders(rows[i]);
+            if (testMapped.foundCount >= 4) {
+                headerIndex = i;
+                mapped = testMapped;
+                break;
+            }
+        }
+
+        if (headerIndex === -1 || !mapped || mapped.missing.length) {
             return {
-                fatal: 'These columns were not found: ' + mapped.missing.map(function (c) { return c.label; }).join(', ') +
-                    '. Please use the downloaded template and keep its header row.',
+                fatal: 'The column headers were not found. Please keep the table header row intact.',
                 ready: [], problems: [], total: 0
             };
         }
@@ -286,16 +297,36 @@
         var problems = [];
         var total = 0;
 
-        for (var r = 1; r < rows.length; r++) {
+        // Start right after the headers (skip "Column 1, Column 2..." if present)
+        var startRow = headerIndex + 1;
+        if (startRow < rows.length) {
+            var checkRow = (rows[startRow] || []).join(' ').toLowerCase();
+            if (checkRow.indexOf('column 1') !== -1 || checkRow.indexOf('column 2') !== -1) {
+                startRow++;
+            }
+        }
+
+        for (var r = startRow; r < rows.length; r++) {
             var cells = rows[r] || [];
+
+            // Stop reading rows when reaching Total Budget or Signatures
+            var lineText = str(cells[0] || cells[1] || cells[9] || '').toLowerCase();
+            if (lineText.indexOf('total budget') !== -1 ||
+                lineText.indexOf('prepared by') !== -1 ||
+                lineText.indexOf('certified funds') !== -1 ||
+                lineText.indexOf('approved by') !== -1 ||
+                lineText.indexOf('endorsed by') !== -1) {
+                break;
+            }
+
             var raw = {};
             var hasData = false;
             COLUMNS.forEach(function (col) {
-                var cell = cells[mapped.index[col.key]];
+                var cell = mapped.index[col.key] !== undefined ? cells[mapped.index[col.key]] : '';
                 raw[col.key] = cell;
                 if (str(cell) !== '') hasData = true;
             });
-            if (!hasData) continue;
+            if (!hasData) continue; // Skip blank rows
 
             total += 1;
             if (total > MAX_IMPORT_ROWS) {
@@ -311,7 +342,7 @@
         }
 
         if (total === 0) {
-            return { fatal: 'No filled-in rows were found under the header row.', ready: [], problems: [], total: 0 };
+            return { fatal: 'No filled-in rows were found under the table header.', ready: [], problems: [], total: 0 };
         }
 
         return { fatal: null, ready: ready, problems: problems, total: total };
@@ -321,74 +352,273 @@
     // Template download
     // ------------------------------------------------------------
 
-    function downloadTemplate() {
-        if (!window.XLSX) {
-            toast('The Excel library could not be loaded. Check your internet connection and reload the page.');
-            return;
-        }
-
-        var allowed = getAllowedValues();
-        var wb = XLSX.utils.book_new();
-
-        // Sheet 1: the one people fill in
-        var items = XLSX.utils.aoa_to_sheet([COLUMNS.map(function (c) { return c.header; })]);
-        items['!cols'] = COLUMNS.map(function (c) { return { wch: c.width }; });
-        XLSX.utils.book_append_sheet(wb, items, TEMPLATE_SHEET);
-
-        // Sheet 2: instructions + a worked example
-        var brackets = (typeof MODE_BUDGET_BRACKETS !== 'undefined' ? MODE_BUDGET_BRACKETS : []).map(function (t) {
-            return '     ' + t.label + '  ->  ' + t.mode;
+    function loadExcelJS() {
+        if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+        return new Promise(function (resolve, reject) {
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+            s.onload = function () { resolve(window.ExcelJS); };
+            s.onerror = function () { reject(new Error('Could not load ExcelJS library')); };
+            document.head.appendChild(s);
         });
-        var example = [
-            'Procurement of 10 laptop computers for field offices',
-            allowed.types.indexOf('Goods') !== -1 ? 'Goods' : (allowed.types[0] || ''),
-            '10 units',
-            'Small Value Procurement (SVP)',
-            'No',
-            allowed.criteria[0] || '',
-            '2026-11-01', '2026-12-15', '2027-01-31',
-            'GAA 2027',
-            850000,
-            allowed.strategies[0] || '',
-            'For regional deployment'
-        ];
-        var instructions = XLSX.utils.aoa_to_sheet([
-            ['HOW TO FILL IN THE PPMP ITEMS TEMPLATE'],
-            [],
-            ['1. Use the "' + TEMPLATE_SHEET + '" sheet. One row = one procurement item. Keep the header row as it is (columns are found by their header text).'],
-            ['2. PPMP No., Fiscal Year, End-User and Indicative/Final are NOT in this file. They come from the request form you upload it into.'],
-            ['3. Dates: type them as YYYY-MM-DD (for example 2026-11-30). Real Excel date cells also work.'],
-            ['4. End of Procurement Activity cannot be before the start. Expected Delivery must be AFTER the end date.'],
-            ['5. Estimated Budget: numbers only (commas are fine). The Mode of Procurement must match the budget when it is one of these:'],
-            [brackets[0] || ''], [brackets[1] || ''], [brackets[2] || ''],
-            ['6. Type of Project, Mode, Pre-Procurement, Bid Criteria and Strategies must match the "Valid Values" sheet (capital letters do not matter).'],
-            ['7. Several strategies in one cell: separate them with a semicolon (;).'],
-            ['8. Supporting documents cannot be put in this file. Imported items are saved as Draft; open the PPMP, click Edit, and attach each item\'s required document before submitting.'],
-            ['9. Rows that fail a check are listed on screen before anything is saved, and only the valid rows are imported.'],
-            [],
-            ['EXAMPLE ROW (this is only an example; do not leave it in the "' + TEMPLATE_SHEET + '" sheet)'],
-            COLUMNS.map(function (c) { return c.header; }),
-            example
-        ]);
-        instructions['!cols'] = [{ wch: 140 }];
-        XLSX.utils.book_append_sheet(wb, instructions, 'Instructions');
+    }
 
-        // Sheet 3: valid values
-        var lists = [
-            ['Type of Project', 'Recommended Mode of Procurement', 'Pre-Procurement Conference', 'Criteria for Bid Evaluation', 'Procurement Strategies and Tools']
-        ];
-        var longest = Math.max(allowed.types.length, allowed.modes.length, allowed.yesNo.length, allowed.criteria.length, allowed.strategies.length);
-        for (var i = 0; i < longest; i++) {
-            lists.push([
-                allowed.types[i] || '', allowed.modes[i] || '', allowed.yesNo[i] || '',
-                allowed.criteria[i] || '', allowed.strategies[i] || ''
-            ]);
+    async function downloadTemplate() {
+        var btn = document.getElementById('biDownloadBtn');
+        if (btn) btn.disabled = true;
+
+        try {
+            toast('Generating styled Excel template...');
+            var ExcelJS = await loadExcelJS();
+
+            var header = readHeader();
+            var ppmpNo = header.ppmp_no || '1';
+            var fiscalYear = header.fiscal_year || new Date().getFullYear();
+            var endUser = header.end_user || 'Free Public Internet Access Program';
+            var isFinal = header.is_indicative === 'Final';
+            var dateStr = new Date().toLocaleDateString('en-US'); // e.g. 10/1/2026
+
+            var workbook = new ExcelJS.Workbook();
+            workbook.creator = 'DICT Procurement System';
+            var sheet = workbook.addWorksheet(TEMPLATE_SHEET, {
+                views: [{ showGridLines: true }]
+            });
+
+            // 1. Column Widths (14 columns)
+            sheet.columns = [
+                { width: 36 }, // Col 1: Description
+                { width: 22 }, // Col 2: Type
+                { width: 24 }, // Col 3: Quantity
+                { width: 26 }, // Col 4: Mode
+                { width: 20 }, // Col 5: Pre-procurement
+                { width: 28 }, // Col 6: Criteria
+                { width: 18 }, // Col 7: Start Date
+                { width: 18 }, // Col 8: End Date
+                { width: 22 }, // Col 9: Delivery
+                { width: 18 }, // Col 10: Fund Source
+                { width: 24 }, // Col 11: Budget
+                { width: 32 }, // Col 12: Strategies
+                { width: 24 }, // Col 13: Attached Docs
+                { width: 20 }  // Col 14: Remarks
+            ];
+
+            // 2. Titles & Metadata
+            sheet.mergeCells('A1:N1');
+            var title = sheet.getCell('A1');
+            title.value = 'PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) NO. ' + ppmpNo;
+            title.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FF000000' } };
+            title.alignment = { horizontal: 'center', vertical: 'middle' };
+            sheet.getRow(1).height = 28;
+
+            sheet.mergeCells('A2:N2');
+            var checks = sheet.getCell('A2');
+            checks.value = isFinal ? '[ ] INDICATIVE     [X] FINAL' : '[X] INDICATIVE     [ ] FINAL';
+            checks.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF000000' } };
+            checks.alignment = { horizontal: 'center', vertical: 'middle' };
+            sheet.getRow(2).height = 20;
+
+            sheet.getRow(3).height = 8;
+
+            var fyCell = sheet.getCell('A4');
+            fyCell.value = 'Fiscal Year : ' + fiscalYear;
+            fyCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
+            sheet.getRow(4).height = 20;
+
+            var euCell = sheet.getCell('A5');
+            euCell.value = 'End-User or Implementing Unit: ' + endUser;
+            euCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
+            sheet.getRow(5).height = 20;
+
+            sheet.getRow(6).height = 10;
+
+            // 3. Group Headers (Row 7)
+            sheet.mergeCells('A7:F7');
+            sheet.getCell('A7').value = 'PROCUREMENT PROJECT DETAILS';
+
+            sheet.mergeCells('G7:I7');
+            sheet.getCell('G7').value = 'PROJECTED TIMELINE (MM/YYYY)';
+
+            sheet.mergeCells('J7:K7');
+            sheet.getCell('J7').value = 'FUNDING DETAILS';
+
+            sheet.mergeCells('L7:L8');
+            sheet.getCell('L7').value = 'PROCUREMENT STRATEGIES AND TOOLS';
+
+            sheet.mergeCells('M7:M8');
+            sheet.getCell('M7').value = 'ATTACHED SUPPORTING DOCUMENTS';
+
+            sheet.mergeCells('N7:N8');
+            sheet.getCell('N7').value = 'REMARKS';
+
+            sheet.getRow(7).height = 24;
+
+            // 4. Subheaders (Row 8)
+            var subHeaders = [
+                'General Description and Objective of the Project to be Procured',
+                'Type of the Project to be Procured',
+                'Quantity and Size of the Project to be Procured',
+                'Recommended Mode of Procurement',
+                'Pre-Procurement Conference (Yes/No)',
+                'Criteria for Bid Evaluation',
+                'Start of Procurement Activity',
+                'End of Procurement Activity',
+                'Expected Delivery/ Implementation Period',
+                'Source of Funds',
+                'Estimated Budget / Authorized Budgetary Allocation (PhP)'
+            ];
+            for (var i = 0; i < subHeaders.length; i++) {
+                sheet.getRow(8).getCell(i + 1).value = subHeaders[i];
+            }
+            sheet.getRow(8).height = 46;
+
+            // 5. Column Numbers (Row 9)
+            for (var c = 1; c <= 14; c++) {
+                sheet.getRow(9).getCell(c).value = 'Column ' + c;
+            }
+            sheet.getRow(9).height = 18;
+
+            // 6. Data Entry Rows (Rows 10 to 14: 5 Blank Sample Rows)
+            for (var r = 10; r <= 14; r++) {
+                sheet.getRow(r).height = 32;
+            }
+
+            // 7. Total Budget Row (Row 15)
+            sheet.mergeCells('A15:J15');
+            var totLabel = sheet.getCell('A15');
+            totLabel.value = 'TOTAL BUDGET:';
+            totLabel.font = { name: 'Arial', size: 9.5, bold: true };
+            totLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+
+            var totVal = sheet.getCell('K15');
+            totVal.value = { formula: 'SUM(K10:K14)', result: 0 };
+            totVal.font = { name: 'Arial', size: 9.5, bold: true };
+            totVal.alignment = { horizontal: 'right', vertical: 'middle' };
+            totVal.numFmt = '"P "#,##0.00';
+            sheet.getRow(15).height = 24;
+
+            // 8. Apply Clean Black Borders & Alignment Across the Table (Rows 7 to 15)
+            var thinBorder = {
+                top: { style: 'thin', color: { argb: 'FF000000' } },
+                left: { style: 'thin', color: { argb: 'FF000000' } },
+                bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                right: { style: 'thin', color: { argb: 'FF000000' } }
+            };
+
+            for (var rowIdx = 7; rowIdx <= 15; rowIdx++) {
+                var rowObj = sheet.getRow(rowIdx);
+                for (var colIdx = 1; colIdx <= 14; colIdx++) {
+                    var cell = rowObj.getCell(colIdx);
+                    cell.border = thinBorder;
+
+                    if (rowIdx <= 9) {
+                        cell.font = { name: 'Arial', size: 8.5, bold: true, color: { argb: 'FF000000' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                    } else if (rowIdx >= 10 && rowIdx <= 14) {
+                        cell.font = { name: 'Arial', size: 9, color: { argb: 'FF000000' } };
+                        var align = (colIdx === 11) ? 'right' : ((colIdx >= 2 && colIdx <= 9) ? 'center' : 'left');
+                        cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
+                        if (colIdx === 11) cell.numFmt = '"P "#,##0.00';
+                    }
+                }
+            }
+
+            // 9. Signatures Block (Rows 18 to 32)
+            sheet.getRow(18).height = 20;
+            sheet.getCell('A18').value = 'Prepared by / Submitted by:';
+            sheet.getCell('A18').font = { name: 'Arial', size: 9.5, bold: true };
+
+            sheet.getCell('F18').value = 'Certified Funds Available:';
+            sheet.getCell('F18').font = { name: 'Arial', size: 9.5, bold: true };
+
+            sheet.getCell('K18').value = 'Approved by:';
+            sheet.getCell('K18').font = { name: 'Arial', size: 9.5, bold: true };
+
+            var sigUnderline = { top: { style: 'medium', color: { argb: 'FF000000' } } };
+
+            // Helper to build a clean signatory block
+            function makeSigBlock(startCol, endCol, name, title, office, date) {
+                var startLetter = String.fromCharCode(64 + startCol);
+                var endLetter = String.fromCharCode(64 + endCol);
+
+                sheet.mergeCells(startLetter + '21:' + endLetter + '21');
+                var nCell = sheet.getCell(startLetter + '21');
+                nCell.value = name;
+                nCell.font = { name: 'Arial', size: 9.5, bold: true };
+                nCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                // Apply underline border across merged cells
+                for (var c = startCol; c <= endCol; c++) {
+                    sheet.getRow(21).getCell(c).border = sigUnderline;
+                }
+
+                sheet.mergeCells(startLetter + '22:' + endLetter + '22');
+                var tCell = sheet.getCell(startLetter + '22');
+                tCell.value = title;
+                tCell.font = { name: 'Arial', size: 8.5 };
+                tCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                sheet.mergeCells(startLetter + '23:' + endLetter + '23');
+                var oCell = sheet.getCell(startLetter + '23');
+                oCell.value = office;
+                oCell.font = { name: 'Arial', size: 8.5 };
+                oCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                if (date) {
+                    var dCell = sheet.getCell(startLetter + '25');
+                    dCell.value = 'Date: ' + date;
+                    dCell.font = { name: 'Arial', size: 8.5 };
+                    dCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+            }
+
+            makeSigBlock(1, 4, 'JAYMARK D. DUMIO', 'Signature over Printed Name', 'Focal, ICT Literacy Competency and Development Bureau X', dateStr);
+            makeSigBlock(6, 9, 'BRYAN JOHN M. SABLAS', 'Signature over Printed Name', 'Budget Officer II', null);
+            makeSigBlock(11, 14, 'SITTIE RAHMA V. ALAWI, MTM, CSSGB', 'Signature over Printed Name', 'Regional Director, DICT X', null);
+
+            // Endorsed By Section
+            sheet.getCell('A27').value = 'Endorsed by:';
+            sheet.getCell('A27').font = { name: 'Arial', size: 9.5, bold: true };
+
+            sheet.mergeCells('A30:D30');
+            var endCell = sheet.getCell('A30');
+            endCell.value = 'EUGENE C. RAPOSALA III';
+            endCell.font = { name: 'Arial', size: 9.5, bold: true };
+            endCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            for (var ec = 1; ec <= 4; ec++) {
+                sheet.getRow(30).getCell(ec).border = sigUnderline;
+            }
+
+            sheet.mergeCells('A31:D31');
+            var endTCell = sheet.getCell('A31');
+            endTCell.value = 'Signature over Printed Name';
+            endTCell.font = { name: 'Arial', size: 8.5 };
+            endTCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            sheet.mergeCells('A32:D32');
+            var endOCell = sheet.getCell('A32');
+            endOCell.value = 'Chief, Technical Operations Division';
+            endOCell.font = { name: 'Arial', size: 8.5 };
+            endOCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // 10. Generate and trigger download
+            var buffer = await workbook.xlsx.writeBuffer();
+            var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = TEMPLATE_FILE;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            toast('Template downloaded successfully.');
+        } catch (err) {
+            console.error('Failed to generate template:', err);
+            toast('Could not download styled template: ' + err.message);
+        } finally {
+            if (btn) btn.disabled = false;
         }
-        var valid = XLSX.utils.aoa_to_sheet(lists);
-        valid['!cols'] = [{ wch: 24 }, { wch: 34 }, { wch: 26 }, { wch: 58 }, { wch: 46 }];
-        XLSX.utils.book_append_sheet(wb, valid, 'Valid Values');
-
-        XLSX.writeFile(wb, TEMPLATE_FILE);
     }
 
     // ------------------------------------------------------------
