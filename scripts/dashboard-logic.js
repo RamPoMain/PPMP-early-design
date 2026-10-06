@@ -480,8 +480,9 @@ function blankPreviewItem() {
     return {
         id: Date.now() + previewItemIdSeq,
         project_description: '', project_type: '', quantity_size: '', mode: '',
-        pre_procurement: '', start_date: '', end_date: '', delivery_period: '',
-        fund_source: '', budget: '', strategies: [], remarks: ''
+        pre_procurement: '', bid_evaluation_criteria: '', start_date: '', end_date: '',
+        delivery_period: '', fund_source: '', budget: '', strategies: [],
+        supporting_documents: [], remarks: ''
     };
 }
 
@@ -494,7 +495,12 @@ function getRawRecordById(id) {
 
 function ensurePreviewDraft(record) {
     if (!previewDrafts[record.id]) {
-        previewDrafts[record.id] = { items: JSON.parse(JSON.stringify(getRecordItems(record))) };
+        previewDrafts[record.id] = {
+            items: JSON.parse(JSON.stringify(getRecordItems(record))),
+            touched: {},      // itemId -> { field: true }; errors only show for touched fields
+            pending: 0,       // files still being read
+            pendingSize: 0    // bytes of those files
+        };
     }
     return previewDrafts[record.id];
 }
@@ -518,9 +524,10 @@ function isPreviewEditing(recordId) {
     return !!previewDrafts[recordId];
 }
 
-// "Edit" no longer turns the dropdown into editable cells: it opens the
-// request form (the same one used everywhere else), so every edit goes
-// through the form's validation.
+// "Edit" turns the PPMP's rows into editable cells right where they are
+// (the Entries dropdown, or the full-screen preview). Nothing is written to
+// storage until Save Changes, and Save is blocked until every value passes
+// the same rules the request form enforces (see validatePreviewItem).
 function startPreviewEdit(recordId) {
     const session = typeof getSession === 'function' ? getSession() : null;
     if (!session || !session.canRequest) {
@@ -528,23 +535,13 @@ function startPreviewEdit(recordId) {
         return;
     }
     const record = getRawRecordById(recordId);
-    if (!record || isPpmpLocked(record)) return;
-
-    if (typeof openRequestModal !== 'function' || !document.getElementById('requestModalOverlay')) return;
-
-    // Don't open the form underneath the full-screen preview.
-    if (activeExcelPreviewId !== null && typeof closeExcelPreview === 'function') {
-        closeExcelPreview();
+    if (!record) return;
+    if (isPpmpLocked(record)) {
+        showToast('This PPMP is locked and can no longer be edited.');
+        return;
     }
-
-    openRequestModal(recordId);
-
-    if (getRecordItems(record).length <= 1) {
-        enableEditMode();
-    } else {
-        // The form edits one item at a time: pick the item, then press Edit.
-        showToast('Use the arrows to pick an item, then press Edit.');
-    }
+    ensurePreviewDraft(record);
+    refreshPreviewSurfaces(recordId);
 }
 
 // The row-level buttons (add entry, Excel preview, view details, delete)
@@ -656,7 +653,15 @@ function isPreviewDirty(recordId) {
     if (!draft) return false;
     const saved = getRawRecordById(recordId);
     if (!saved) return true;
-    return JSON.stringify(draft.items) !== JSON.stringify(getRecordItems(saved));
+    return previewSignature(draft.items) !== previewSignature(getRecordItems(saved));
+}
+
+// Attachments are megabytes of base64, so compare their length instead of
+// their contents - cheap enough to run on every keystroke.
+function previewSignature(items) {
+    return JSON.stringify(items, function (key, value) {
+        return key === 'dataUrl' ? (value ? value.length : 0) : value;
+    });
 }
 
 function selectOptionsHtml(options, current) {
@@ -689,7 +694,7 @@ function buildEditableItemRow(record, item) {
         `;
     }).join('');
 
-    const docsDisplay = renderPreviewDocs(item, record.id);
+    const docsDisplay = renderPreviewDocEditor(item, record.id);
 
     return `
         <tr data-preview-item-row="${iid}">
@@ -724,19 +729,19 @@ function buildEditableItemRow(record, item) {
             </select></td>
             
             <!-- Col 7: Start Date -->
-            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="start_date" value="${escapeHtml(item.start_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="start_date" min="2000-01-01" max="2100-12-31" value="${escapeHtml(item.start_date || '')}" oninput="onPreviewFieldInput(this)"></td>
             
             <!-- Col 8: End Date -->
-            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="end_date" value="${escapeHtml(item.end_date || '')}" oninput="onPreviewFieldInput(this)"></td>
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="end_date" min="${escapeHtml(item.start_date || '2000-01-01')}" max="2100-12-31" value="${escapeHtml(item.end_date || '')}" oninput="onPreviewFieldInput(this)"></td>
             
             <!-- Col 9: Delivery Period -->
-            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="delivery_period" value="${escapeHtml(item.delivery_period || '')}" oninput="onPreviewFieldInput(this)"></td>
+            <td><input type="date" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="delivery_period" min="${escapeHtml(item.end_date ? previewNextDay(item.end_date) : '2000-01-01')}" max="2100-12-31" value="${escapeHtml(item.delivery_period || '')}" oninput="onPreviewFieldInput(this)"></td>
             
             <!-- Col 10: Fund Source -->
             <td><input type="text" class="ep-input" data-record-id="${rid}" data-item-id="${iid}" data-field="fund_source" value="${escapeHtml(item.fund_source || '')}" oninput="onPreviewFieldInput(this)" placeholder="Source of funds"></td>
             
             <!-- Col 11: Budget -->
-            <td><input type="text" class="ep-input ep-budget" data-record-id="${rid}" data-item-id="${iid}" data-field="budget" value="${escapeHtml(item.budget || '')}" oninput="onPreviewFieldInput(this)" placeholder="0.00"></td>
+            <td><input type="text" class="ep-input ep-budget" data-record-id="${rid}" data-item-id="${iid}" data-field="budget" value="${escapeHtml(item.budget || '')}" oninput="onPreviewFieldInput(this)" placeholder="0.00" inputmode="decimal" autocomplete="off"></td>
             
             <!-- Col 12: Procurement Strategies & Tools -->
             <td style="min-width: 220px; width: 220px; vertical-align: top;">
@@ -746,8 +751,8 @@ function buildEditableItemRow(record, item) {
             </td>
             
             <!-- Col 13: Attached Supporting Documents -->
-            <td style="min-width: 140px; width: 140px;">
-                <div style="font-size: 10.5px; line-height: 1.4; word-break: break-word; color: #374151;">
+            <td class="ep-doc-cell" data-record-id="${rid}" data-item-id="${iid}" style="min-width: 180px; width: 180px; vertical-align: top;">
+                <div class="ep-doc-cell-body" style="font-size: 10.5px; line-height: 1.4; word-break: break-word; color: #374151;">
                     ${docsDisplay}
                 </div>
             </td>
@@ -899,7 +904,7 @@ function renderPreviewList(values) {
 }
 
 
-function buildExcelPreviewMarkup(record, editable) {
+function buildExcelPreviewMarkup(record, editable, showSignatures = true) {
     const isIndicative = record.is_indicative === 'Indicative';
     const isFinal = record.is_indicative === 'Final';
     const items = editable ? ensurePreviewDraft(record).items : getRecordItems(record);
@@ -1018,7 +1023,7 @@ function buildExcelPreviewMarkup(record, editable) {
                         ${editable ? `
                         <tr class="ep-add-row">
                             <td colspan="15">
-                                <button type="button" class="ep-add-btn" onclick="addItemViaRequestModal(${Number(record.id)})">
+                                <button type="button" class="ep-add-btn" onclick="addPreviewItem(${Number(record.id)})">
                                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5V19M5 12H19" stroke-linecap="round"/></svg>
                                     Add Item
                                 </button>
@@ -1029,6 +1034,7 @@ function buildExcelPreviewMarkup(record, editable) {
                 </table>
             </div>
 
+            ${showSignatures ? `
             <div class="excel-preview-signatures">
                 <div>
                     <p>Prepared by / Submitted by:</p>
@@ -1061,6 +1067,7 @@ function buildExcelPreviewMarkup(record, editable) {
                     <small>Chief, Technical Operations Division</small>
                 </div>
             </div>
+            ` : ''}
         </div>
     `;
 }
@@ -1119,6 +1126,7 @@ function renderExcelPreviewOverlay(record) {
 
     overlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    reapplyPreviewErrors();
 }
 
 
@@ -1235,6 +1243,11 @@ function populateOfficeFilter(records) {
 let expandedEntryId = null;
 
 function toggleEntryPreviewRow(id) {
+    // Collapsing (or opening another PPMP) throws away unsaved edits, so ask first.
+    if (expandedEntryId !== null && isPreviewDirty(expandedEntryId) &&
+        !confirm('You have unsaved changes in this PPMP. Discard them?')) {
+        return;
+    }
     // Whichever row was open loses its unsaved draft, whether we collapse it
     // or switch to another row.
     if (expandedEntryId !== null) {
@@ -1266,8 +1279,24 @@ function onPreviewFieldInput(el) {
     const item = draft.items.find(it => it.id == itemId);
     if (!item) return;
 
+    // Stop clearly wrong characters at the keyboard.
+    if (field === 'budget') {
+        const cleaned = cleanBudgetInput(el.value);
+        if (cleaned !== el.value) el.value = cleaned;
+    }
+
     item[field] = el.value;
     updatePreviewDirtyIndicator(recordId);
+
+    // Picking from a list or a calendar is a deliberate choice, so check it
+    // right away; for typed text wait until the person leaves the box
+    // (unless it already showed an error - then clear it as they fix it).
+    if (el.tagName === 'SELECT' || el.type === 'date') markPreviewTouched(draft, itemId, field);
+
+    if (field === 'start_date' || field === 'end_date') syncPreviewDateLimits(recordId, itemId, item);
+    if (field === 'project_type') refreshPreviewDocCell(recordId, itemId);
+
+    if (isPreviewTouched(draft, itemId, field)) validatePreviewField(recordId, itemId, field);
 }
 
 function onPreviewStrategyToggle(checkbox) {
@@ -1283,6 +1312,393 @@ function onPreviewStrategyToggle(checkbox) {
     if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
     item.strategies = Array.from(current);
     updatePreviewDirtyIndicator(recordId);
+
+    markPreviewTouched(draft, itemId, 'strategies');
+    validatePreviewField(recordId, itemId, 'strategies');
+}
+
+// Leaving a text box counts as "done typing", so its error (if any) can show.
+document.addEventListener('focusout', function (e) {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains('ep-input')) return;
+    const recordId = Number(el.dataset.recordId);
+    const itemId = Number(el.dataset.itemId);
+    const field = el.dataset.field;
+    const draft = previewDrafts[recordId];
+    if (!draft || !field) return;
+    markPreviewTouched(draft, itemId, field);
+    validatePreviewField(recordId, itemId, field);
+});
+
+// Budget: digits and one decimal point, at most 2 decimals.
+function cleanBudgetInput(raw) {
+    let value = String(raw).replace(/[^0-9.]/g, '');
+    const parts = value.split('.');
+    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+    const bits = value.split('.');
+    if (bits.length === 2) value = bits[0] + '.' + bits[1].slice(0, 2);
+    return value;
+}
+
+function previewNextDay(isoDate) {
+    const d = new Date(isoDate + 'T00:00:00Z');
+    if (isNaN(d)) return '2000-01-01';
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+}
+
+// Keeps the calendar pickers from offering dates the rules would reject.
+function syncPreviewDateLimits(recordId, itemId, item) {
+    document.querySelectorAll(`[data-record-id="${recordId}"][data-item-id="${itemId}"][data-field="end_date"]`).forEach(el => {
+        el.min = item.start_date || '2000-01-01';
+    });
+    document.querySelectorAll(`[data-record-id="${recordId}"][data-item-id="${itemId}"][data-field="delivery_period"]`).forEach(el => {
+        el.min = item.end_date ? previewNextDay(item.end_date) : '2000-01-01';
+    });
+}
+
+// ------------------------------------------------------------
+// Validation for inline edits. These are the same rules the request form
+// applies (required fields, minimum lengths, budget > 0, mode matching the
+// budget bracket, date order), so an edit made here can never save
+// something the form would have refused.
+// ------------------------------------------------------------
+const PREVIEW_ALL_FIELDS = [
+    'project_description', 'project_type', 'quantity_size', 'mode', 'pre_procurement',
+    'bid_evaluation_criteria', 'start_date', 'end_date', 'delivery_period',
+    'fund_source', 'budget', 'strategies', 'remarks'
+];
+
+// When one field changes, these others may become right or wrong too.
+const PREVIEW_FIELD_DEPENDENTS = {
+    budget: ['budget', 'mode'],
+    mode: ['mode', 'budget'],
+    start_date: ['start_date', 'end_date', 'delivery_period'],
+    end_date: ['end_date', 'delivery_period'],
+    delivery_period: ['end_date', 'delivery_period']
+};
+
+const PREVIEW_FALLBACK_BRACKETS = [
+    { max: 199999, mode: 'Direct Acquisition', label: '\u20B10 \u2013 \u20B1199,999' },
+    { max: 1999999, mode: 'Small Value Procurement (SVP)', label: '\u20B1200,000 \u2013 \u20B11,999,999' },
+    { max: Infinity, mode: 'Competitive Bidding', label: '\u20B12,000,000 and above' }
+];
+
+function getPreviewModeValues() {
+    const out = [];
+    PREVIEW_MODE_GROUPS.forEach(group => (group.options || []).forEach(opt => out.push(opt)));
+    return out;
+}
+
+function parsePreviewBudget(raw) {
+    const cleaned = String(raw == null ? '' : raw).replace(/[,\s\u20B1]/g, '').replace(/^P/i, '');
+    if (cleaned === '' || !/^\d*\.?\d+$|^\d+\.$/.test(cleaned)) return NaN;
+    return Number(cleaned);
+}
+
+function isRealPreviewDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const d = new Date(value + 'T00:00:00Z');
+    if (isNaN(d) || d.toISOString().slice(0, 10) !== value) return false;
+    const year = d.getUTCFullYear();
+    return year >= 2000 && year <= 2100;
+}
+
+// Returns { field: 'message' } for everything wrong with one item.
+function validatePreviewItem(item) {
+    const errors = {};
+    const text = key => String(item[key] == null ? '' : item[key]).trim();
+
+    if (!text('project_description')) errors.project_description = 'Project description is required.';
+
+    if (!text('project_type')) errors.project_type = 'Select a type of project.';
+    else if (PREVIEW_PROJECT_TYPES.indexOf(text('project_type')) === -1) errors.project_type = 'Choose a type from the list.';
+
+    if (!text('quantity_size')) errors.quantity_size = 'Quantity and size is required.';
+    else if (text('quantity_size').length < 3) errors.quantity_size = 'Please provide a more detailed quantity or size.';
+
+    if (!text('mode')) errors.mode = 'Select a mode of procurement.';
+    else if (getPreviewModeValues().indexOf(text('mode')) === -1) errors.mode = 'Choose a mode from the list.';
+
+    if (!text('pre_procurement')) errors.pre_procurement = 'Select Yes or No.';
+    else if (['Yes', 'No'].indexOf(text('pre_procurement')) === -1) errors.pre_procurement = 'Choose Yes or No.';
+
+    if (!text('bid_evaluation_criteria')) errors.bid_evaluation_criteria = 'Select the criteria for bid evaluation.';
+    else if (PREVIEW_CRITERIA_OPTIONS.indexOf(text('bid_evaluation_criteria')) === -1) errors.bid_evaluation_criteria = 'Choose a criteria from the list.';
+
+    // Dates: present, real, in range, and in order.
+    const start = text('start_date'), end = text('end_date'), delivery = text('delivery_period');
+    if (!start) errors.start_date = 'Select a start date.';
+    else if (!isRealPreviewDate(start)) errors.start_date = 'Enter a valid date (2000-2100).';
+    if (!end) errors.end_date = 'Select an end date.';
+    else if (!isRealPreviewDate(end)) errors.end_date = 'Enter a valid date (2000-2100).';
+    if (!delivery) errors.delivery_period = 'Select the expected delivery/implementation date.';
+    else if (!isRealPreviewDate(delivery)) errors.delivery_period = 'Enter a valid date (2000-2100).';
+
+    if (!errors.start_date && !errors.end_date && new Date(end) < new Date(start)) {
+        errors.end_date = 'End date cannot be earlier than the start date.';
+    }
+    if (!errors.end_date && !errors.delivery_period && new Date(delivery) <= new Date(end)) {
+        errors.delivery_period = 'Delivery must be after the end of procurement activity.';
+    }
+
+    if (!text('fund_source')) errors.fund_source = 'Source of funds is required.';
+    else if (text('fund_source').length < 2) errors.fund_source = 'Please provide a valid fund source.';
+
+    // Budget: a real number above zero, and consistent with the mode.
+    const budgetRaw = text('budget');
+    const budgetNumber = parsePreviewBudget(budgetRaw);
+    if (!budgetRaw) errors.budget = 'Estimated budget is required.';
+    else if (isNaN(budgetNumber)) errors.budget = 'Budget must contain a valid number.';
+    else if (budgetNumber <= 0) errors.budget = 'Budget must be greater than 0.';
+
+    if (!errors.mode && !errors.budget && text('mode') && budgetRaw) {
+        const brackets = (typeof MODE_BUDGET_BRACKETS !== 'undefined') ? MODE_BUDGET_BRACKETS : PREVIEW_FALLBACK_BRACKETS;
+        const isBracketMode = brackets.some(tier => tier.mode === text('mode'));
+        if (isBracketMode) {
+            const recommended = brackets.find(tier => budgetNumber <= tier.max) || brackets[brackets.length - 1];
+            if (recommended.mode !== text('mode')) {
+                const message = 'A budget of \u20B1' + budgetNumber.toLocaleString('en-PH', { maximumFractionDigits: 2 }) +
+                    ' falls in the ' + recommended.label + ' bracket, which requires "' + recommended.mode + '".';
+                errors.mode = message;
+                errors.budget = message;
+            }
+        }
+    }
+
+    if (!Array.isArray(item.strategies) || item.strategies.length === 0) {
+        errors.strategies = 'Select at least one procurement strategy.';
+    }
+
+    if (!text('remarks')) errors.remarks = 'Remarks are required.';
+    else if (text('remarks').length < 3) errors.remarks = 'Remarks must contain at least 3 characters.';
+
+    return errors;
+}
+
+function markPreviewTouched(draft, itemId, field) {
+    if (!draft.touched) draft.touched = {};
+    if (!draft.touched[itemId]) draft.touched[itemId] = {};
+    draft.touched[itemId][field] = true;
+}
+
+function isPreviewTouched(draft, itemId, field) {
+    return !!(draft.touched && draft.touched[itemId] && draft.touched[itemId][field]);
+}
+
+// Shows (or clears) the red outline + message under one field, on every
+// surface currently showing this record.
+function setPreviewFieldError(recordId, itemId, field, message) {
+    const selector = field === 'strategies'
+        ? `.ep-strategies-box[data-record-id="${recordId}"][data-item-id="${itemId}"]`
+        : `[data-record-id="${recordId}"][data-item-id="${itemId}"][data-field="${field}"]`;
+
+    document.querySelectorAll(selector).forEach(el => {
+        const cell = el.closest('td');
+        if (!cell) return;
+        el.classList.toggle('is-invalid', !!message);
+        let msg = cell.querySelector('.ep-cell-error[data-for="' + field + '"]');
+        if (message) {
+            if (!msg) {
+                msg = document.createElement('div');
+                msg.className = 'ep-cell-error';
+                msg.dataset.for = field;
+                msg.setAttribute('role', 'alert');
+                cell.appendChild(msg);
+            }
+            msg.textContent = message;
+        } else if (msg) {
+            msg.remove();
+        }
+    });
+}
+
+// Re-checks one field (and the fields that depend on it, if the person has
+// already visited them).
+function validatePreviewField(recordId, itemId, field) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item) return;
+
+    const errors = validatePreviewItem(item);
+
+    // A mode that doesn't fit the budget is wrong on BOTH fields, so show it
+    // on both. A dependent field is also updated if it is already showing an
+    // error (so the error disappears when the other field is fixed).
+    const sharedMismatch = !!errors.mode && errors.mode === errors.budget;
+    (PREVIEW_FIELD_DEPENDENTS[field] || [field]).forEach(f => {
+        const showingError = !!document.querySelector(
+            `.ep-cell-error[data-for="${f}"]`
+        ) && !!document.querySelector(`[data-record-id="${recordId}"][data-item-id="${itemId}"][data-field="${f}"].is-invalid, .ep-strategies-box.is-invalid[data-item-id="${itemId}"]`);
+        const isBracketField = (f === 'mode' || f === 'budget') && sharedMismatch;
+        if (f === field || isPreviewTouched(draft, itemId, f) || isBracketField || showingError) {
+            setPreviewFieldError(recordId, itemId, f, errors[f] || '');
+        }
+    });
+}
+
+// Checks every item and shows every problem. Returns how many fields failed.
+function validatePreviewDraft(recordId) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return 0;
+    let count = 0;
+    draft.items.forEach(item => {
+        const errors = validatePreviewItem(item);
+        PREVIEW_ALL_FIELDS.forEach(field => {
+            markPreviewTouched(draft, item.id, field);
+            setPreviewFieldError(recordId, item.id, field, errors[field] || '');
+            if (errors[field]) count += 1;
+        });
+    });
+    return count;
+}
+
+// A re-render (for example after Add Item) rebuilds the cells, so put back
+// the errors for every field the person has already visited.
+function reapplyPreviewErrors() {
+    Object.keys(previewDrafts).forEach(key => {
+        const recordId = Number(key);
+        const draft = previewDrafts[key];
+        draft.items.forEach(item => {
+            const errors = validatePreviewItem(item);
+            PREVIEW_ALL_FIELDS.forEach(field => {
+                if (isPreviewTouched(draft, item.id, field) && errors[field]) {
+                    setPreviewFieldError(recordId, item.id, field, errors[field]);
+                }
+            });
+        });
+    });
+}
+
+// ------------------------------------------------------------
+// Supporting documents while editing: attach, open, download, remove.
+// Same limits as the request form (2 MB per file, 8 MB per item).
+// ------------------------------------------------------------
+function previewFileLimits() {
+    return {
+        file: (typeof MAX_FILE_SIZE === 'number') ? MAX_FILE_SIZE : 2 * 1024 * 1024,
+        total: (typeof MAX_TOTAL_SIZE === 'number') ? MAX_TOTAL_SIZE : 8 * 1024 * 1024
+    };
+}
+
+function previewFormatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function renderPreviewDocEditor(item, recordId) {
+    const docs = Array.isArray(item && item.supporting_documents) ? item.supporting_documents : [];
+    const limits = previewFileLimits();
+    const labels = (typeof PROJECT_TYPE_DOC_LABELS !== 'undefined') ? PROJECT_TYPE_DOC_LABELS : {};
+    const required = labels[item && item.project_type];
+    const rid = Number(recordId);
+    const iid = escapeHtml(item.id);
+
+    const list = docs.length === 0
+        ? '<span class="ep-none">None attached</span>'
+        : '<ul class="ep-list ep-doc-list">' + docs.map(function (doc, index) {
+            const name = (doc && doc.name) || 'Document';
+            const attrs = ' data-record-id="' + rid + '" data-item-id="' + iid + '" data-doc-index="' + index + '"';
+            const open = (doc && doc.dataUrl)
+                ? '<button type="button" class="ep-doc-link"' + attrs + ' title="Open ' + escapeHtml(name) + '" onclick="openPreviewDoc(this, event)">' + escapeHtml(name) + '</button>' +
+                  '<button type="button" class="ep-doc-download"' + attrs + ' title="Download ' + escapeHtml(name) + '" aria-label="Download ' + escapeHtml(name) + '" onclick="downloadPreviewDoc(this, event)">' +
+                  '<svg viewBox="0 0 24 24" width="12" height="12" fill="none"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+                : '<span>' + escapeHtml(name) + '</span>';
+            return '<li class="ep-doc-item">' + open +
+                '<button type="button" class="ep-doc-remove"' + attrs + ' title="Remove ' + escapeHtml(name) + '" aria-label="Remove ' + escapeHtml(name) + '" onclick="removePreviewDoc(this, event)">' +
+                '<svg viewBox="0 0 24 24" width="11" height="11" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></li>';
+        }).join('') + '</ul>';
+
+    return list +
+        '<input type="file" class="ep-doc-input" multiple hidden data-record-id="' + rid + '" data-item-id="' + iid + '" onchange="onPreviewDocsPicked(this)">' +
+        '<button type="button" class="ep-doc-attach-btn" onclick="triggerPreviewDocPicker(this)">+ Attach file</button>' +
+        '<div class="ep-doc-hint">' + (required ? 'Required: ' + escapeHtml(required) + '. ' : 'Pick a project type to see the required document. ') +
+        'Max ' + previewFormatSize(limits.file) + ' per file.</div>';
+}
+
+function refreshPreviewDocCell(recordId, itemId) {
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item) return;
+    document.querySelectorAll(`.ep-doc-cell[data-record-id="${recordId}"][data-item-id="${itemId}"] .ep-doc-cell-body`).forEach(body => {
+        body.innerHTML = renderPreviewDocEditor(item, recordId);
+    });
+}
+
+function triggerPreviewDocPicker(btn) {
+    const cell = btn.closest('.ep-doc-cell');
+    const input = cell && cell.querySelector('.ep-doc-input');
+    if (input) input.click();
+}
+
+function onPreviewDocsPicked(input) {
+    const recordId = Number(input.dataset.recordId);
+    const itemId = Number(input.dataset.itemId);
+    const draft = previewDrafts[recordId];
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!draft || files.length === 0) return;
+
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item) return;
+    if (!Array.isArray(item.supporting_documents)) item.supporting_documents = [];
+
+    const limits = previewFileLimits();
+    const problems = [];
+    let usedBytes = item.supporting_documents.reduce((sum, d) => sum + (Number(d.size) || 0), 0) + (draft.pendingSize || 0);
+
+    files.forEach(file => {
+        const duplicate = item.supporting_documents.some(d => d.name === file.name && Number(d.size) === file.size);
+        if (duplicate) { problems.push('"' + file.name + '" is already attached.'); return; }
+        if (file.size > limits.file) {
+            problems.push('"' + file.name + '" is ' + previewFormatSize(file.size) + ', over the ' + previewFormatSize(limits.file) + ' per-file limit.');
+            return;
+        }
+        if (usedBytes + file.size > limits.total) {
+            problems.push('Adding "' + file.name + '" would exceed the ' + previewFormatSize(limits.total) + ' limit for this item.');
+            return;
+        }
+
+        usedBytes += file.size;
+        draft.pending = (draft.pending || 0) + 1;
+        draft.pendingSize = (draft.pendingSize || 0) + file.size;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            draft.pending -= 1;
+            draft.pendingSize -= file.size;
+            if (previewDrafts[recordId] !== draft) return;      // edit was cancelled meanwhile
+            item.supporting_documents.push({ name: file.name, size: file.size, dataUrl: event.target.result });
+            refreshPreviewDocCell(recordId, itemId);
+            updatePreviewDirtyIndicator(recordId);
+        };
+        reader.onerror = function () {
+            draft.pending -= 1;
+            draft.pendingSize -= file.size;
+            showToast('"' + file.name + '" could not be read. Please try attaching it again.');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    if (problems.length) {
+        showToast(problems[0] + (problems.length > 1 ? ' (+' + (problems.length - 1) + ' more)' : ''));
+    }
+}
+
+function removePreviewDoc(btn, event) {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    const recordId = Number(btn.dataset.recordId);
+    const itemId = btn.dataset.itemId;
+    const draft = previewDrafts[recordId];
+    if (!draft) return;
+    const item = draft.items.find(it => it.id == itemId);
+    if (!item || !Array.isArray(item.supporting_documents)) return;
+    item.supporting_documents.splice(Number(btn.dataset.docIndex), 1);
+    refreshPreviewDocCell(recordId, itemId);
+    updatePreviewDirtyIndicator(recordId);
 }
 
 function addPreviewItem(recordId) {
@@ -1290,8 +1706,18 @@ function addPreviewItem(recordId) {
     if (!record || isPpmpLocked(record)) return;
 
     const draft = ensurePreviewDraft(record);
-    draft.items.push(blankPreviewItem());
+    const fresh = blankPreviewItem();
+    draft.items.push(fresh);
     refreshPreviewSurfaces(recordId);
+
+    // Drop the cursor into the new row's first box.
+    setTimeout(function () {
+        const first = document.querySelector(`[data-record-id="${recordId}"][data-item-id="${fresh.id}"][data-field="project_description"]`);
+        if (first) {
+            if (typeof first.scrollIntoView === 'function') first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            first.focus({ preventScroll: true });
+        }
+    }, 0);
 }
 
 // "Add Item" in the preview dropdown now opens the request modal (the same
@@ -1492,6 +1918,7 @@ function removePreviewItem(recordId, itemId) {
 // Resets the draft back to the last-saved version (does not collapse the
 // dropdown), so the person can see the discard take effect immediately.
 function discardPreviewChanges(recordId) {
+    if (isPreviewDirty(recordId) && !confirm('Discard your unsaved changes to this PPMP?')) return;
     delete previewDrafts[recordId];
     refreshPreviewSurfaces(recordId);
 }
@@ -1500,9 +1927,29 @@ function savePreviewChanges(recordId) {
     const draft = previewDrafts[recordId];
     if (!draft) return;
 
-    const hasEmptyDescription = draft.items.some(it => !String(it.project_description || '').trim());
-    if (hasEmptyDescription) {
-        showToast('Each item needs a project description before saving.');
+    if (draft.pending > 0) {
+        showToast('Still attaching files - wait a moment, then press Save Changes again.');
+        return;
+    }
+
+    // Tidy the text the person typed, then check every item against the same
+    // rules the request form uses. Nothing is saved until all of it passes.
+    draft.items.forEach(item => {
+        ['project_description', 'quantity_size', 'fund_source', 'remarks'].forEach(key => {
+            item[key] = String(item[key] == null ? '' : item[key]).trim();
+        });
+        const budget = parsePreviewBudget(item.budget);
+        if (!isNaN(budget)) item.budget = String(item.budget).replace(/[,\s\u20B1]/g, '').replace(/^P/i, '');
+    });
+
+    const problemCount = validatePreviewDraft(recordId);
+    if (problemCount > 0) {
+        showToast('Please fix ' + problemCount + ' highlighted ' + (problemCount === 1 ? 'field' : 'fields') + ' before saving.');
+        const firstBad = document.querySelector('.ep-input.is-invalid, .ep-strategies-box.is-invalid');
+        if (firstBad) {
+            if (typeof firstBad.scrollIntoView === 'function') firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            if (typeof firstBad.focus === 'function' && firstBad.tagName !== 'DIV') firstBad.focus({ preventScroll: true });
+        }
         return;
     }
 
@@ -1522,7 +1969,7 @@ function savePreviewChanges(recordId) {
     try {
         localStorage.setItem('procurement_records', JSON.stringify(all));
     } catch (err) {
-        showToast('Could not save changes — please try again.');
+        showToast('Could not save - the attached files are too large for browser storage. Remove or shrink an attachment and try again.');
         return;
     }
 
@@ -1793,7 +2240,7 @@ function renderEntries(records) {
                     <div class="db-entry-expand-inner">
                         ${buildPreviewToolbarHtml(Number(record.id), { record: record, canEdit: isEditable })}
                         ${isEditing ? '' : buildItemFilterBarHtml(record)}
-                        ${buildExcelPreviewMarkup(record, isEditing)}
+                        ${buildExcelPreviewMarkup(record, isEditing, false)}
                     </div>
                 </td>
             </tr>
@@ -1802,6 +2249,7 @@ function renderEntries(records) {
     }).join('');
 
     applyEntryItemFilters();
+    reapplyPreviewErrors();
 }
 
 function initEntryFilters() {
@@ -2097,5 +2545,17 @@ document.addEventListener('keydown', function (event) {
 document.addEventListener('click', function (event) {
     if (event.target && event.target.id === 'excelPreviewOverlay') {
         closeExcelPreview();
+    }
+});
+
+// Leaving the page with unsaved inline edits (or an attachment still being
+// read) triggers the browser's own "Leave site?" warning.
+window.addEventListener('beforeunload', function (e) {
+    const hasUnsaved = Object.keys(previewDrafts).some(function (id) {
+        return isPreviewDirty(Number(id)) || previewDrafts[id].pending > 0;
+    });
+    if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = '';
     }
 });
