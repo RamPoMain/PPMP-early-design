@@ -324,19 +324,32 @@ function getPendingPpmpGroups() {
 
 function startNewRequest() {
     const session = typeof getSession === 'function' ? getSession() : null;
-    if (!session || !session.canRequest) {
+    if (session && !session.canRequest) {
         showToast('Your account is view/approve only and cannot create new requests.');
         return;
     }
-    const groups = getPendingPpmpGroups();
-    const chooser = document.getElementById('ppmpChoiceModalOverlay');
 
-    if (groups.length === 0 || !chooser) {
-        openRequestModal();
+    const allRecords = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const office = session ? session.office : null;
+    const records = office ? allRecords.filter(r => r.end_user === office) : allRecords;
+
+    // 1. If ongoing PPMP is submitted for review, block until higher-ups approve or return it
+    const submittedPpmp = records.find(r => getPpmpStatus(r) === 'For Approval');
+    if (submittedPpmp) {
+        showToast('PPMP No. ' + (submittedPpmp.ppmp_no || 'N/A') + ' is currently submitted for approval. You cannot add entries or start a new PPMP until it is approved or returned.');
         return;
     }
 
-    openPpmpChoiceModal(groups);
+    // 2. If there is an existing Draft PPMP, directly open the form to add the next item!
+    const draftRecords = records.filter(r => getPpmpStatus(r) === 'Draft');
+    if (draftRecords.length > 0) {
+        const targetPpmpNo = draftRecords[0].ppmp_no || '1';
+        addEntryToPpmp(targetPpmpNo);
+        return;
+    }
+
+    // 3. No active PPMPs exist (all deleted or fully approved) -> Start a brand new PPMP
+    openRequestModal();
 }
 
 
@@ -345,7 +358,11 @@ function openPpmpChoiceModal(groups) {
     const select = document.getElementById('pendingPpmpSelect');
 
     if (!overlay || !select) {
-        openRequestModal();
+        if (groups && groups.length > 0) {
+            addEntryToPpmp(groups[0].ppmp_no);
+        } else {
+            openRequestModal();
+        }
         return;
     }
 
@@ -355,23 +372,45 @@ function openPpmpChoiceModal(groups) {
         `<option value="${esc(group.ppmp_no)}">PPMP No. ${esc(group.ppmp_no)} — FY ${esc(group.fiscal_year || 'N/A')} (${group.count} ${group.count === 1 ? 'entry' : 'entries'})</option>`
     ).join('');
 
+    // Hide "Start New PPMP"
+    const startNewBtn = overlay.querySelector('.choice-footer .back-btn, button[onclick*="startBrandNewPpmp"]');
+    if (startNewBtn) {
+        startNewBtn.style.display = 'none';
+    }
+
+    const desc = overlay.querySelector('.choice-description');
+    if (desc) {
+        desc.textContent = "You have an ongoing PPMP in progress. Add this as another entry under it.";
+    }
+
     overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
 }
 
 
 function closePpmpChoiceModal() {
     const overlay = document.getElementById('ppmpChoiceModalOverlay');
-    if (overlay) overlay.classList.add('hidden');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+    }
 }
 
 
 function confirmAddToSelectedPpmp() {
     const select = document.getElementById('pendingPpmpSelect');
-    const ppmpNo = select && select.value;
+    const ppmpNo = select ? select.value : null;
 
     closePpmpChoiceModal();
 
-    if (ppmpNo) addEntryToPpmp(ppmpNo);
+    if (ppmpNo) {
+        addEntryToPpmp(ppmpNo);
+    } else {
+        const groups = typeof getPendingPpmpGroups === 'function' ? getPendingPpmpGroups() : [];
+        if (groups.length > 0) {
+            addEntryToPpmp(groups[0].ppmp_no);
+        }
+    }
 }
 
 
@@ -2444,54 +2483,88 @@ let currentEditingItemId = null; // Which item within that PPMP is loaded (null 
 let currentItemIndex = 0; // Which item the on-screen navigator is pointing at
 
 function openRequestModal(id = null) {
-    resetRequestForm(); // Clear everything first
-    
-    const overlay = document.getElementById('requestModalOverlay');
-    if (!overlay) return;
+    console.log("openRequestModal() opening with id:", id);
 
+    const overlay = document.getElementById('requestModalOverlay');
+    if (!overlay) {
+        console.error("Critical: #requestModalOverlay element was not found in the HTML.");
+        return;
+    }
+
+    // Run form reset safely
+    try {
+        resetRequestForm();
+    } catch (err) {
+        console.warn("resetRequestForm caught an issue (proceeding anyway):", err);
+    }
+
+    // Force display in case inline style or class is blocking it
     overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
     if (id) {
         // VIEW MODE
         currentEditingId = id;
-        loadRecordIntoModal(id);
+        if (typeof loadRecordIntoModal === 'function') {
+            loadRecordIntoModal(id);
+        }
     } else {
         // NEW REQUEST MODE
         currentEditingId = null;
         isViewMode = false;
-        enableModalFields();
-        initializePpmpNumber();
-        initializeFiscalYear();
-        document.getElementById('finishBtn').innerText = 'Finish →';
+
+        try { enableModalFields(); } catch (e) { console.warn(e); }
+        try { initializePpmpNumber(); } catch (e) { console.warn(e); }
+        try { initializeFiscalYear(); } catch (e) { console.warn(e); }
+
+        const finishBtn = document.getElementById('finishBtn');
+        if (finishBtn) {
+            finishBtn.innerText = 'Finish →';
+            finishBtn.onclick = saveProcurementRequest;
+        }
     }
 }
 
 
 function addEntryToPpmp(ppmpNo) {
-    // Same form as a normal "new request", except this save appends a new
-    // line item onto the existing PPMP record (currentEditingId) instead
-    // of creating a brand-new one — so it shows up as one more item under
-    // the same row in Entries, not a separate entry.
-    resetRequestForm();
+    // 1. Reset form fields cleanly
+    try {
+        resetRequestForm();
+    } catch (err) {
+        console.warn("resetRequestForm issue:", err);
+    }
 
+    // 2. Make modal visible
     const overlay = document.getElementById('requestModalOverlay');
     if (!overlay) return;
 
     overlay.classList.remove('hidden');
+    overlay.style.display = 'flex'; // <-- FIX: Resets inline display so modal appears!
     document.body.style.overflow = 'hidden';
 
-    const records = typeof getRecords === 'function' ? getRecords() : [];
-    const groupRecord = records.find(r => String(r.ppmp_no) === String(ppmpNo) && getPpmpStatus(r) === 'Draft')
-        || records.find(r => String(r.ppmp_no) === String(ppmpNo));
+    // 3. Find the parent PPMP directly from localStorage
+    const allRecords = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const groupRecord = allRecords.find(r => String(r.ppmp_no) === String(ppmpNo) && getPpmpStatus(r) === 'Draft')
+        || allRecords.find(r => String(r.ppmp_no) === String(ppmpNo));
 
     currentEditingId = groupRecord ? groupRecord.id : null;
-    currentEditingItemId = null; // null here means "this save creates a new item"
+    currentEditingItemId = null; // null means saving will append a new item
     isViewMode = false;
-    enableModalFields(); // also sets ppmp_no / fiscal_year readOnly = true
 
+    // 4. Enable fields
+    try {
+        enableModalFields();
+    } catch (err) {
+        console.warn("enableModalFields issue:", err);
+    }
+
+    // 5. Pre-fill and lock the header fields to the parent PPMP
     const ppmpField = document.getElementById('ppmp_no');
-    if (ppmpField) ppmpField.value = ppmpNo;
+    if (ppmpField) {
+        ppmpField.value = ppmpNo;
+        ppmpField.readOnly = true;
+    }
 
     const fiscalYearField = document.getElementById('fiscal_year');
     if (fiscalYearField) {
@@ -2499,21 +2572,20 @@ function addEntryToPpmp(ppmpNo) {
         fiscalYearField.readOnly = true;
     }
 
-    // end_user and is_indicative describe the PPMP as a whole, not this one
-    // item, so lock them to the group's existing values — a second item
-    // can't disagree with the first about who the PPMP is for.
     const endUserField = document.getElementById('end_user');
     if (endUserField) {
-        endUserField.value = (groupRecord && groupRecord.end_user) || '';
+        const session = typeof getSession === 'function' ? getSession() : null;
+        endUserField.value = (groupRecord && groupRecord.end_user) || (session ? session.office : '');
         endUserField.readOnly = true;
     }
 
     const indicativeField = document.getElementById('is_indicative');
     if (indicativeField) {
-        indicativeField.value = (groupRecord && groupRecord.is_indicative) || '';
-        indicativeField.disabled = true;
+        indicativeField.value = (groupRecord && groupRecord.is_indicative) || 'Indicative';
+        indicativeField.disabled = true; // locked to parent PPMP's choice
     }
 
+    // 6. Ensure Finish button saves the new entry
     const finishBtn = document.getElementById('finishBtn');
     if (finishBtn) {
         finishBtn.innerText = 'Finish →';
@@ -2522,11 +2594,13 @@ function addEntryToPpmp(ppmpNo) {
 
     hideItemNavigator();
 
-    document.getElementById('finishBtn').innerText = 'Finish \u2192';
-    document.getElementById('page-title').innerText = 'NEW ITEM \u2014 PPMP NO. ' + ppmpNo;
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) {
+        titleEl.innerText = 'NEW ITEM — PPMP NO. ' + ppmpNo;
+    }
 
     if (typeof showToast === 'function') {
-        showToast(`Adding a new line item under PPMP No. ${ppmpNo}.`);
+        showToast('Adding a new line item under PPMP No. ' + ppmpNo + '.');
     }
 }
 
@@ -3163,13 +3237,11 @@ function enableModalFields() {
 
 
 function closeRequestModal() {
-
-    const overlay =
-        document.getElementById('requestModalOverlay');
-
+    const overlay = document.getElementById('requestModalOverlay');
     if (!overlay) return;
 
     overlay.classList.add('hidden');
+    overlay.style.display = 'none'; // Resets display
     document.body.style.overflow = '';
     currentEditingId = null;
     currentEditingItemId = null;
