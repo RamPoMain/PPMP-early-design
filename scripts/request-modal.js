@@ -2543,8 +2543,15 @@ function addEntryToPpmp(ppmpNo) {
     overlay.style.display = 'flex'; // <-- FIX: Resets inline display so modal appears!
     document.body.style.overflow = 'hidden';
 
-    // 3. Find the parent PPMP directly from localStorage
-    const allRecords = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    // 3. Find the parent PPMP directly from localStorage.
+    // PPMP numbers are only unique PER OFFICE (every office numbers its PPMPs
+    // from 1), so the lookup must be limited to the signed-in office. Without
+    // this, "PPMP No. 1" can resolve to ANOTHER office's PPMP: the form then
+    // shows that office as End-User and the new entry is saved into its record.
+    const lookupSession = typeof getSession === 'function' ? getSession() : null;
+    const lookupOffice = lookupSession && lookupSession.office ? lookupSession.office : null;
+    const allRecords = (JSON.parse(localStorage.getItem('procurement_records')) || [])
+        .filter(r => !lookupOffice || r.end_user === lookupOffice);
     const groupRecord = allRecords.find(r => String(r.ppmp_no) === String(ppmpNo) && getPpmpStatus(r) === 'Draft')
         || allRecords.find(r => String(r.ppmp_no) === String(ppmpNo));
 
