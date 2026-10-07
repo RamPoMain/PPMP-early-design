@@ -556,7 +556,7 @@ function buildEntryActionButtonsHtml(record) {
     return `
         <div class="db-entry-actions">
             ${(isPending && canReq) ? `
-            <button type="button" class="db-action-btn" title="Add another entry to this PPMP" onclick="requestAddEntryToPpmp('${escapeHtml(record.ppmp_no || '')}')">
+            <button type="button" class="db-action-btn" title="Add another entry to this PPMP" onclick="addEntryInline(${recordId})">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5V19M5 12H19"/></svg>
             </button>
             ` : ''}
@@ -622,6 +622,10 @@ function buildPreviewToolbarHtml(recordId, options = {}) {
         <div class="ep-toolbar">
             <span class="ep-dirty-indicator${isPreviewDirty(recordId) ? '' : ' hidden'}" data-record-id="${recordId}">Unsaved changes</span>
             <div class="ep-toolbar-actions">
+                <button type="button" class="ep-add-btn" onclick="addPreviewItem(${Number(recordId)})">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5V19M5 12H19" stroke-linecap="round"/></svg>
+                    Add Item
+                </button>
                 <button type="button" class="ep-discard-btn" onclick="discardPreviewChanges(${recordId})">Cancel</button>
                 <button type="button" class="ep-save-btn" onclick="savePreviewChanges(${recordId})">Save Changes</button>
             </div>
@@ -1720,31 +1724,23 @@ function addPreviewItem(recordId) {
     }, 0);
 }
 
-// "Add Item" in the preview dropdown now opens the request modal (the same
-// form as the "+" row button) instead of inserting a blank row to type into.
-// Unsaved inline edits are kept safe: closing the preview or hopping from
-// entries.html to index.html would discard them, so ask to save first.
-function addItemViaRequestModal(recordId) {
+// The "+" button in the dropdown toolbar: switches the PPMP into edit mode
+// (if it isn't already) and drops a blank row in, so another entry is typed
+// straight into the dropdown instead of going through the request form.
+// Nothing is saved until Save Changes, same as every other inline edit.
+function addEntryInline(recordId) {
     const session = typeof getSession === 'function' ? getSession() : null;
     if (!session || !session.canRequest) {
         showToast('Your account is view/approve only and cannot add items.');
         return;
     }
     const record = getRawRecordById(recordId);
-    if (!record || isPpmpLocked(record)) return;
-
-    if (isPreviewDirty(recordId)) {
-        showToast('You have unsaved changes - Save or Discard them, then add the new item.');
+    if (!record) return;
+    if (isPpmpLocked(record)) {
+        showToast('This PPMP is locked and can no longer be edited.');
         return;
     }
-
-    // Close the full-screen preview (if it is the surface being used) so the
-    // request modal is not opened underneath it.
-    if (activeExcelPreviewId !== null && typeof closeExcelPreview === 'function') {
-        closeExcelPreview();
-    }
-
-    requestAddEntryToPpmp(String(record.ppmp_no || ''));
+    addPreviewItem(recordId);
 }
 
 // ------------------------------------------------------------
