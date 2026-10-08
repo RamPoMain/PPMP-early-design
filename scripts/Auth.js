@@ -96,6 +96,16 @@ const ACCOUNTS = [
         stage: 'RD'
     },
     {
+        // Suppliers: view-only. No `canRequest` (can't create PPMPs) and no
+        // `canApprove` (can't approve). There is deliberately no `office`,
+        // so getRecords() in dashboard-logic.js applies no office filter
+        // and this account sees every office's PPMPs.
+        email: 'suppliers@dict.gov.ph',
+        password: 'suppliers123',
+        role: 'SUP',
+        roleName: 'Suppliers'
+    },
+    {
         email: 'test@dict.gov.ph',
         password: 'test123',
         role: 'POP',
