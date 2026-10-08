@@ -1171,19 +1171,32 @@ function closeExcelPreview() {
 
 function renderAppExportButton() {
     const session = typeof getSession === 'function' ? getSession() : null;
-    if (!session) return;
 
-    // Check if button is already rendered
-    if (document.getElementById('exportAppPdfBtn')) return;
+    // Find any existing button (whether dynamically created or hardcoded in HTML)
+    const existingBtn = document.getElementById('exportAppPdfBtn') || document.querySelector('.export-app-btn');
 
-    // Find the toolbar/filter area on entries.html or index.html
+    // 1. If not logged in or NOT a Supplier (role is not 'SUP'), ensure it is hidden and exit
+    if (!session || session.role !== 'SUP') {
+        if (existingBtn) {
+            existingBtn.style.display = 'none';
+        }
+        return;
+    }
+
+    // 2. If already present in HTML or previously rendered, ensure it is visible for the Supplier
+    if (existingBtn) {
+        existingBtn.style.display = 'inline-flex';
+        return;
+    }
+
+    // 3. Otherwise, dynamically inject the button into the toolbar for the Supplier
     const filterBar = document.querySelector('.db-entries-toolbar, .db-filter-bar, .db-content-header');
     if (!filterBar) return;
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'exportAppPdfBtn';
-    btn.className = 'db-action-btn-primary';
+    btn.className = 'db-action-btn-primary export-app-btn';
     btn.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; background-color: #2563eb; color: #fff; border: none; cursor: pointer; margin-left: auto;';
     btn.innerHTML = `
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">

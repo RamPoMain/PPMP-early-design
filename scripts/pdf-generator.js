@@ -314,6 +314,13 @@ async function generatePPMP_PDF() {
 // ============================================================
 
 async function generateAPP_PDF(targetYear = null) {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session || session.role !== 'SUP') {
+        const msg = 'Access denied: Only Suppliers can generate the Annual Procurement Plan (APP).';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
+    
     if (!window.jspdf || !window.jspdf.jsPDF) {
         const msg = 'The PDF library could not be loaded. Check your internet connection.';
         if (typeof showToast === 'function') showToast(msg); else alert(msg);
