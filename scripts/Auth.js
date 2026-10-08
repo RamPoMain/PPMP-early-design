@@ -104,9 +104,9 @@ const ACCOUNTS = [
         password: 'suppliers123',
         role: 'SUP',
         roleName: 'Suppliers',
-        // Read-only tracking: sees every submitted PPMP (For Approval and
-        // Completed, never Drafts) along with where it is in the approval chain.
-        canTrackApprovals: true
+        canRequest: false,
+        canApprove: false,
+        canTrackApprovals: false
     },
     {
         email: 'test@dict.gov.ph',
@@ -114,7 +114,8 @@ const ACCOUNTS = [
         role: 'POP',
         roleName: 'POP (Test Account)',
         office: 'POP Test Office',
-        canRequest: true
+        canRequest: true,
+        canApprove: false
     },
 ];
 

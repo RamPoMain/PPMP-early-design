@@ -41,6 +41,11 @@ function getRecords() {
     if (!session) return [];
 
     return allRecords.filter(record => {
+        // Suppliers can ONLY view final, fully approved PPMPs
+        if (session.role === 'SUP') {
+            return record.status === 'Completed';
+        }
+
         // 1. Requesters see every PPMP that belongs to their office
         //    (drafts included), whatever stage it is at.
         if (session.canRequest && record.end_user === session.office) {
@@ -1164,6 +1169,46 @@ function closeExcelPreview() {
     document.body.style.overflow = '';
 }
 
+function renderAppExportButton() {
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (!session) return;
+
+    // Check if button is already rendered
+    if (document.getElementById('exportAppPdfBtn')) return;
+
+    // Find the toolbar/filter area on entries.html or index.html
+    const filterBar = document.querySelector('.db-entries-toolbar, .db-filter-bar, .db-content-header');
+    if (!filterBar) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'exportAppPdfBtn';
+    btn.className = 'db-action-btn-primary';
+    btn.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; background-color: #2563eb; color: #fff; border: none; cursor: pointer; margin-left: auto;';
+    btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Export APP (PDF)
+    `;
+    btn.onclick = function() {
+        if (typeof generateAPP_PDF === 'function') {
+            generateAPP_PDF();
+        } else {
+            alert('PDF Generator is not available.');
+        }
+    };
+
+    filterBar.appendChild(btn);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    renderAppExportButton();
+});
 
 function getFilteredEntryRecords(records) {
     const statusFilter = document.getElementById('entryStatusFilter');

@@ -307,3 +307,285 @@ async function generatePPMP_PDF() {
 
     doc.save(`PPMP_${data.ppmp}_${String(data.unit).replace(/[^\w-]+/g, '_')}.pdf`);
 }
+
+// ============================================================
+// ANNUAL PROCUREMENT PLAN (APP) — PDF GENERATOR (GPPB FORMAT)
+// Aggregates all approved line items into the 12-column APP table
+// ============================================================
+
+async function generateAPP_PDF(targetYear = null) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        const msg = 'The PDF library could not be loaded. Check your internet connection.';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    if (typeof doc.autoTable !== 'function') {
+        const msg = 'The PDF table plugin could not be loaded.';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
+
+    // 1. Gather all Completed (fully approved) PPMPs
+    const records = JSON.parse(localStorage.getItem('procurement_records')) || [];
+    const approvedRecords = records.filter(r => r.status === 'Completed');
+
+    if (approvedRecords.length === 0) {
+        const msg = 'No fully approved PPMPs available to generate the Annual Procurement Plan.';
+        if (typeof showToast === 'function') showToast(msg); else alert(msg);
+        return;
+    }
+
+    // Determine Fiscal Year
+    const fiscalYear = targetYear || approvedRecords[0].fiscal_year || new Date().getFullYear();
+    const relevantRecords = approvedRecords.filter(r => !targetYear || String(r.fiscal_year) === String(targetYear));
+
+    // Flatten line items with their parent implementing unit
+    let appItems = [];
+    relevantRecords.forEach(record => {
+        const items = (typeof getRecordItems === 'function' ? getRecordItems(record) : (record.items || [record]));
+        items.forEach(item => {
+            appItems.push({
+                ...item,
+                end_user: record.end_user || 'N/A'
+            });
+        });
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    let currentY = 25;
+
+    // 2. Banner Image
+    try {
+        const response = await fetch('images/header-banner.png');
+        if (response.ok) {
+            const blob = await response.blob();
+            const imgData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+
+            const natural = await new Promise((resolve, reject) => {
+                const probe = new Image();
+                probe.onload = () => resolve({ w: probe.naturalWidth, h: probe.naturalHeight });
+                probe.onerror = reject;
+                probe.src = imgData;
+            });
+
+            const maxImgWidth = pageWidth - margin * 2;
+            const maxImgHeight = 25;
+            const scale = Math.min(maxImgWidth / natural.w, maxImgHeight / natural.h);
+            const imgWidth = natural.w * scale;
+            const imgHeight = natural.h * scale;
+            const imgX = (pageWidth - imgWidth) / 2;
+
+            doc.addImage(imgData, 'PNG', imgX, 5, imgWidth, imgHeight);
+            currentY = 5 + imgHeight + 8;
+        }
+    } catch (e) {
+        console.warn('Banner image could not be loaded:', e);
+        currentY = 25;
+    }
+
+    // 3. Document Title & Checkboxes (Matches Screenshot)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(`ANNUAL PROCUREMENT PLAN FOR FY ${fiscalYear}`, pageWidth / 2, currentY, { align: 'center' });
+
+    currentY += 6;
+    doc.setFontSize(9);
+    // [ ] INDICATIVE
+    doc.rect(pageWidth / 2 - 38, currentY - 3.5, 4, 4);
+    doc.text('INDICATIVE', pageWidth / 2 - 32, currentY);
+
+    // [X] FINAL (Always checked for fully approved APP)
+    doc.rect(pageWidth / 2 + 5, currentY - 3.5, 4, 4);
+    doc.text('X', pageWidth / 2 + 6, currentY - 0.5);
+    doc.text('FINAL', pageWidth / 2 + 11, currentY);
+
+    currentY += 8;
+
+    // 4. Table Headers (12 Columns)
+    const headers = [
+        [
+            { content: 'PROCUREMENT PROJECT DETAILS', colSpan: 6, styles: { halign: 'center' } },
+            { content: 'PROJECTED TIMELINE (MM/YYYY)', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'FUNDING DETAILS', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'PROCUREMENT STRATEGY OR TOOLS', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+            { content: 'REMARKS\n(Other relevant descriptions of the procurement project, if applicable)', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
+        ],
+        [
+            'Project Title',
+            'End-User or Implementing Unit',
+            'General Description of the Project',
+            'Mode of Procurement',
+            'To be covered by an Early Procurement Activity? (Yes/No)',
+            'Criteria for Bid Evaluation\n(Including Sustainability and Domestic Preference)',
+            'Start of Procurement Activity',
+            'End of Procurement Activity',
+            'Source of Fund',
+            'Estimated Budget / Approved Budget for the Contract (PhP)'
+        ],
+        [
+            'Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5', 'Column 6',
+            'Column 7', 'Column 8', 'Column 9', 'Column 10', 'Column 11', 'Column 12'
+        ]
+    ];
+
+    // Helper budget parser
+    const parseBudget = (raw) => parseFloat(String(raw).replace(/[^0-9.]/g, '')) || 0;
+    const totalBudget = appItems.reduce((sum, item) => sum + parseBudget(item.budget), 0);
+    const formattedTotal = totalBudget.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
+    // 5. Data Rows
+    const tableBody = [
+        // Category grouping header (as seen in screenshot: "General Requirements")
+        [
+            { content: 'General Requirements', colSpan: 12, styles: { fontStyle: 'bold', fillColor: [245, 245, 245] } }
+        ]
+    ];
+
+    appItems.forEach(item => {
+        const itemBudget = parseBudget(item.budget).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+        const strategies = Array.isArray(item.strategies) ? item.strategies.join('\n') : (item.strategies || '');
+
+        tableBody.push([
+            item.project_description || item.project_type || 'N/A',     // Col 1: Project Title
+            item.end_user || 'N/A',                                     // Col 2: End-User
+            item.quantity_size ? `${item.project_description} (${item.quantity_size})` : (item.project_description || ''), // Col 3: Description
+            item.mode || 'N/A',                                         // Col 4: Mode of Procurement
+            item.pre_procurement || 'No',                               // Col 5: Early Procurement (Yes/No)
+            item.bid_evaluation_criteria || 'N/A',                       // Col 6: Criteria
+            item.start_date || '',                                      // Col 7: Start Date
+            item.end_date || '',                                        // Col 8: End Date
+            item.fund_source || 'N/A',                                  // Col 9: Source of Fund
+            `P ${itemBudget}`,                                          // Col 10: Budget (PhP)
+            strategies,                                                 // Col 11: Strategies
+            item.remarks || ''                                          // Col 12: Remarks
+        ]);
+    });
+
+    // Total Budget Row
+    tableBody.push([
+        { content: 'TOTAL BUDGET:', colSpan: 9, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: `P ${formattedTotal}`, styles: { halign: 'right', fontStyle: 'bold' } },
+        '',
+        ''
+    ]);
+
+    // Usable Width & Column Width distribution (Total: 277mm)
+    const usableWidth = pageWidth - margin * 2;
+    const colWeights = [
+        9,    // Col 1: Project Title
+        9.5,  // Col 2: End-User
+        10.5, // Col 3: General Description
+        9,    // Col 4: Mode of Procurement
+        6.5,  // Col 5: EPA (Yes/No)
+        9.5,  // Col 6: Bid Criteria
+        6.5,  // Col 7: Start Date
+        6.5,  // Col 8: End Date
+        7,    // Col 9: Source of Fund
+        9.5,  // Col 10: Budget (PhP)
+        9,    // Col 11: Strategies
+        7     // Col 12: Remarks
+    ];
+    const totalWeights = colWeights.reduce((a, b) => a + b, 0);
+    const columnStyles = {};
+    colWeights.forEach((w, idx) => {
+        columnStyles[idx] = { cellWidth: (usableWidth * w) / totalWeights };
+    });
+    columnStyles[9].halign = 'right'; // Budget column right aligned
+
+    doc.autoTable({
+        startY: currentY,
+        head: headers,
+        body: tableBody,
+        theme: 'grid',
+        margin: { left: margin, right: margin },
+        tableWidth: usableWidth,
+        rowPageBreak: 'avoid',
+        styles: {
+            fontSize: 5.5,
+            cellPadding: 1.5,
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            overflow: 'linebreak',
+            valign: 'top'
+        },
+        headStyles: {
+            fillColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 5.5,
+            halign: 'center',
+            valign: 'middle',
+            cellPadding: 1.5
+        },
+        columnStyles: columnStyles
+    });
+
+    // 6. Signatories Block (Page break if not enough space)
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let finalY = doc.lastAutoTable.finalY + 12;
+
+    if (finalY + 65 > pageHeight) {
+        doc.addPage();
+        finalY = 20;
+    }
+
+    doc.setFontSize(7);
+    
+    // Left: Prepared by
+    doc.text('Prepared by / Submitted by:', margin, finalY);
+    doc.line(margin, finalY + 10, margin + 60, finalY + 10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('JAYMARK D. DUMIO', margin + 30, finalY + 14, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Signature over Printed Name', margin + 30, finalY + 18, { align: 'center' });
+    doc.text('BAC Secretariat / Focal Person', margin + 30, finalY + 22, { align: 'center' });
+    doc.text('Date: ' + new Date().toLocaleDateString(), margin + 30, finalY + 28, { align: 'center' });
+
+    // Center: Certified Funds Available
+    doc.text('Certified Funds Available:', pageWidth / 2 - 30, finalY);
+    doc.line(pageWidth / 2 - 35, finalY + 10, pageWidth / 2 + 25, finalY + 10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BRYAN JOHN M. SABLAS', pageWidth / 2 - 5, finalY + 14, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Signature over Printed Name', pageWidth / 2 - 5, finalY + 18, { align: 'center' });
+    doc.text('Budget Officer II', pageWidth / 2 - 5, finalY + 22, { align: 'center' });
+
+    // Right: Approved by
+    doc.text('Approved by:', pageWidth - 70, finalY);
+    doc.line(pageWidth - 70, finalY + 10, pageWidth - margin, finalY + 10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SITTIE RAHMA V. ALAWI, MTM, CSSGB', pageWidth - 35, finalY + 14, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Signature over Printed Name', pageWidth - 35, finalY + 18, { align: 'center' });
+    doc.text('Regional Director, DICT X', pageWidth - 35, finalY + 22, { align: 'center' });
+
+    // Endorsed by (Bottom left)
+    const endorseY = finalY + 36;
+    doc.text('Endorsed by:', margin, endorseY);
+    doc.line(margin, endorseY + 10, margin + 60, endorseY + 10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EUGENE C. RAPOSALA III', margin + 30, endorseY + 14, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Signature over Printed Name', margin + 30, endorseY + 18, { align: 'center' });
+    doc.text('Chief, Technical Operations Division', margin + 30, endorseY + 22, { align: 'center' });
+
+    // 7. Save File
+    doc.save(`APP_FY_${fiscalYear}_DICT.pdf`);
+    if (typeof showToast === 'function') {
+        showToast(`Annual Procurement Plan for FY ${fiscalYear} generated successfully.`);
+    }
+}
