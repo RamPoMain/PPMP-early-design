@@ -2082,3 +2082,97 @@ html[data-theme="light"] .modal-status-badge.is-returned { color: #B91C1C; }
 
 .ep-doc-remove:focus-visible,
 .ep-doc-attach-btn:focus-visible { outline: 2px solid #0088ff; outline-offset: 2px; }
+
+
+/* ============================================================
+   SUPPLIER: GENERATE APP
+   Sidebar link (.db-nav-app) and the Entries header button
+   (.db-app-btn). Only rendered for the Suppliers account - see
+   renderAppExportButton() in dashboard-logic.js.
+   ============================================================ */
+
+.db-topbar-actions { align-items: center; }
+
+.db-app-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 18px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--db-accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.28);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.db-app-btn:hover {
+    background: #2563EB;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+/* Sidebar: tinted so it reads as an action, not a page */
+.db-nav-app {
+    background: var(--db-accent-soft);
+    color: var(--db-accent);
+    font-weight: 600;
+}
+
+.db-nav-app:hover {
+    background: var(--db-accent);
+    color: #fff;
+}
+
+.db-app-btn:focus-visible,
+.db-nav-app:focus-visible {
+    outline: 2px solid var(--db-accent);
+    outline-offset: 2px;
+}
+
+/* Busy state while the PDF is being built */
+.db-app-btn.is-loading,
+.db-nav-app.is-loading {
+    pointer-events: none;
+    opacity: 0.75;
+}
+
+.db-app-btn.is-loading::after,
+.db-nav-app.is-loading::after {
+    content: '';
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: db-app-spin 0.7s linear infinite;
+}
+
+.db-nav-app.is-loading::after { margin-left: auto; }
+
+@keyframes db-app-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .db-app-btn.is-loading::after,
+    .db-nav-app.is-loading::after {
+        animation: none;
+        border-right-color: currentColor;
+        opacity: 0.6;
+    }
+}
+
+@media (max-width: 860px) {
+    .db-nav { flex-wrap: wrap; }
+}
+
+@media (max-width: 620px) {
+    .db-topbar-actions { width: 100%; }
+    .db-app-btn { flex: 1; }
+}

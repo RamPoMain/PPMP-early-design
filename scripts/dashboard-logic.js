@@ -1169,54 +1169,111 @@ function closeExcelPreview() {
     document.body.style.overflow = '';
 }
 
-function renderAppExportButton() {
+// ============================================================
+// SUPPLIER: GENERATE APP
+// Suppliers get a "Generate APP" link in the sidebar of every page and a
+// prominent button in the Entries page header. Both build the Annual
+// Procurement Plan immediately (generateAPP_PDF in pdf-generator.js).
+// Every other account never sees them. The Export APP buttons inside the
+// request modal (.export-app-btn) follow the same rule - all copies of them,
+// not just the first one that shares the duplicated id.
+// ============================================================
+
+const APP_NAV_ICON =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+        '<path d="M7 3.5H14L18 7.5V19.5C18 20.05 17.55 20.5 17 20.5H7C6.45 20.5 6 20.05 6 19.5V4.5C6 3.95 6.45 3.5 7 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' +
+        '<path d="M14 3.5V7.5H18" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' +
+        '<path d="M12 11V16M12 16L9.8 13.8M12 16L14.2 13.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+
+let appGenerating = false;
+
+function isSupplierSession() {
     const session = typeof getSession === 'function' ? getSession() : null;
+    return !!(session && session.role === 'SUP');
+}
 
-    // Find any existing button (whether dynamically created or hardcoded in HTML)
-    const existingBtn = document.getElementById('exportAppPdfBtn') || document.querySelector('.export-app-btn');
-
-    // 1. If not logged in or NOT a Supplier (role is not 'SUP'), ensure it is hidden and exit
-    if (!session || session.role !== 'SUP') {
-        if (existingBtn) {
-            existingBtn.style.display = 'none';
+// Shows a busy state on every Generate APP trigger while the PDF is built
+// (the label changes too, so the feedback doesn't depend on animation).
+function setAppButtonsBusy(busy) {
+    document.querySelectorAll('[data-generate-app], [data-app-entry-btn]').forEach(function (el) {
+        const label = el.querySelector('.db-app-label');
+        el.classList.toggle('is-loading', busy);
+        el.setAttribute('aria-busy', busy ? 'true' : 'false');
+        if (!label) return;
+        if (busy) {
+            el.dataset.idleLabel = label.textContent;
+            label.textContent = 'Generating\u2026';
+        } else if (el.dataset.idleLabel) {
+            label.textContent = el.dataset.idleLabel;
         }
+    });
+}
+
+// One entry point for the sidebar link and the Entries button.
+async function runGenerateApp() {
+    if (appGenerating) return;
+
+    if (!isSupplierSession()) {
+        showToast('Only Suppliers can generate the Annual Procurement Plan.');
+        return;
+    }
+    if (typeof generateAPP_PDF !== 'function') {
+        showToast('The PDF generator is not available on this page.');
         return;
     }
 
-    // 2. If already present in HTML or previously rendered, ensure it is visible for the Supplier
-    if (existingBtn) {
-        existingBtn.style.display = 'inline-flex';
-        return;
+    appGenerating = true;
+    setAppButtonsBusy(true);
+    try {
+        await generateAPP_PDF();
+    } catch (err) {
+        console.error('APP generation failed:', err);
+        showToast('The APP could not be generated. Please try again.');
+    } finally {
+        appGenerating = false;
+        setAppButtonsBusy(false);
     }
+}
 
-    // 3. Otherwise, dynamically inject the button into the toolbar for the Supplier
-    const filterBar = document.querySelector('.db-entries-toolbar, .db-filter-bar, .db-content-header');
-    if (!filterBar) return;
+// Adds the "Generate APP" link to the sidebar, right under Entries.
+function addGenerateAppNavItem() {
+    document.querySelectorAll('.db-nav').forEach(function (nav) {
+        if (nav.querySelector('[data-generate-app]')) return;
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'exportAppPdfBtn';
-    btn.className = 'db-action-btn-primary export-app-btn';
-    btn.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; background-color: #2563eb; color: #fff; border: none; cursor: pointer; margin-left: auto;';
-    btn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-        Export APP (PDF)
-    `;
-    btn.onclick = function() {
-        if (typeof generateAPP_PDF === 'function') {
-            generateAPP_PDF();
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'db-nav-item db-nav-app';
+        link.setAttribute('data-generate-app', '');
+        link.setAttribute('role', 'button');
+        link.title = 'Generate the Annual Procurement Plan from all approved PPMPs';
+        link.innerHTML = APP_NAV_ICON + '<span class="db-app-label">Generate APP</span>';
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            runGenerateApp();
+        });
+
+        const entriesLink = nav.querySelector('a[href="entries.html"]');
+        if (entriesLink) {
+            entriesLink.after(link);
         } else {
-            alert('PDF Generator is not available.');
+            nav.appendChild(link);
         }
-    };
+    });
+}
 
-    filterBar.appendChild(btn);
+function renderAppExportButton() {
+    const supplier = isSupplierSession();
+
+    // Entries header button + every Export APP button in the request modal.
+    document.querySelectorAll('.export-app-btn, [data-app-entry-btn]').forEach(function (btn) {
+        btn.style.display = supplier ? 'inline-flex' : 'none';
+    });
+
+    // The sidebar "Generate APP" link is intentionally no longer added for
+    // Suppliers. They still generate the APP from the Entries page header
+    // button and the Export APP buttons in the request modal.
+    // (addGenerateAppNavItem() is kept above in case it is needed again.)
 }
 
 document.addEventListener('DOMContentLoaded', function () {
