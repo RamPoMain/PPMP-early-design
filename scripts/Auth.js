@@ -98,12 +98,15 @@ const ACCOUNTS = [
     {
         // Suppliers: view-only. No `canRequest` (can't create PPMPs) and no
         // `canApprove` (can't approve). There is deliberately no `office`,
-        // so getRecords() in dashboard-logic.js applies no office filter
-        // and this account sees every office's PPMPs.
+        // so getRecords() in dashboard-logic.js applies no office filter;
+        // `canTrackApprovals` (below) is what lets it see submitted PPMPs.
         email: 'suppliers@dict.gov.ph',
         password: 'suppliers123',
         role: 'SUP',
-        roleName: 'Suppliers'
+        roleName: 'Suppliers',
+        // Read-only tracking: sees every submitted PPMP (For Approval and
+        // Completed, never Drafts) along with where it is in the approval chain.
+        canTrackApprovals: true
     },
     {
         email: 'test@dict.gov.ph',
@@ -133,6 +136,7 @@ function buildSession(account) {
         office: account.office,
         canApprove: !!account.canApprove,
         canRequest: !!account.canRequest,
+        canTrackApprovals: !!account.canTrackApprovals,
         stage: account.stage || null,
         headOf: account.headOf || null
     };

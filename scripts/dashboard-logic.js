@@ -54,7 +54,14 @@ function getRecords() {
             return true;
         }
 
-        // 3. Approvers see submitted PPMPs that are waiting at their stage,
+        // 3. Tracking accounts (Suppliers) see every submitted PPMP - waiting
+        //    in the approval chain or fully approved - but never Drafts.
+        if (session.canTrackApprovals) {
+            const st = getPpmpStatus(record);
+            if (st === 'For Approval' || st === 'Completed') return true;
+        }
+
+        // 4. Approvers see submitted PPMPs that are waiting at their stage,
         //    or that they already acted on (so a forwarded PPMP does not
         //    vanish from their list). Unit heads: own office only.
         if (session.canApprove && getPpmpStatus(record) === 'For Approval') {
@@ -178,7 +185,15 @@ function renderStatusPill(record, submittedTitle) {
             ' - open the PPMP to read the remarks">Returned</span>';
     }
     const status = getPpmpStatus(record);
-    return '<span class="db-status-pill ' + statusPillClass(status) + '"' + (submittedTitle || '') + '>' + status + '</span>';
+    // Tracking accounts (Suppliers) also see whose desk a submitted PPMP is on.
+    let label = status;
+    const session = typeof getSession === 'function' ? getSession() : null;
+    if (status === 'For Approval' && session && session.canTrackApprovals) {
+        const stageLabels = { HEAD: 'Unit Head', TOD: 'TOD', BO: 'Budget Officer', RD: 'Regional Director' };
+        const where = stageLabels[record.currentApproverRole];
+        if (where) label = 'For Approval · ' + where;
+    }
+    return '<span class="db-status-pill ' + statusPillClass(status) + '"' + (submittedTitle || '') + '>' + label + '</span>';
 }
 
 // Approved PPMPs can only be deleted by an approver.
